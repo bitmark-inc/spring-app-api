@@ -1,4 +1,4 @@
-# FBM API server
+# Spring API server
 ---
 ## Prequisites
 - Go 1.13

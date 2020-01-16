@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"net/http"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/store"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"

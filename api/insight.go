@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/gin-gonic/gin"
 )
 

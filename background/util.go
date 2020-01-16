@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/store"
 
 	"time"
 )

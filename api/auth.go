@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	jwt "github.com/dgrijalva/jwt-go"
 	jwtrequest "github.com/dgrijalva/jwt-go/request"
 	"github.com/gin-gonic/gin"

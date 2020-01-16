@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
 )
 
 var (

@@ -1,6 +1,6 @@
 FROM golang:1.13-alpine as build
 
-WORKDIR $GOPATH/github.com/bitmark-inc/fbm-apps/fbm-api
+WORKDIR $GOPATH/github.com/bitmark-inc/spring-app-api
 
 ADD go.mod .
 ADD go.sum .
@@ -9,7 +9,7 @@ RUN go mod download
 
 ADD . .
 
-RUN go install github.com/bitmark-inc/fbm-apps/fbm-api
+RUN go install github.com/bitmark-inc/spring-app-api
 
 # ---
 

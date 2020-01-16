@@ -5,7 +5,7 @@ import (
 	"errors"
 	"math"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"

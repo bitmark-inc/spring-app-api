@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/logmodule"
+	"github.com/bitmark-inc/spring-app-api/logmodule"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4"

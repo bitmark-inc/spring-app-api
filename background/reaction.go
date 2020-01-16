@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/external/fbarchive"
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"

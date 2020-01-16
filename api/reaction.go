@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"

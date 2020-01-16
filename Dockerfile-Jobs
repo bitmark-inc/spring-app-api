@@ -1,13 +1,13 @@
 FROM golang:1.13-alpine as build
 
-WORKDIR /go/src/github.com/bitmark-inc/fbm-apps/fbm-api
+WORKDIR /go/src/github.com/bitmark-inc/spring-app-api
 
 ADD . .
 
-WORKDIR /go/src/github.com/bitmark-inc/fbm-apps/fbm-api/background
+WORKDIR /go/src/github.com/bitmark-inc/spring-app-api/background
 RUN go mod download
 
-RUN go install github.com/bitmark-inc/fbm-apps/fbm-api/background
+RUN go install github.com/bitmark-inc/spring-app-api/background
 
 # ---
 

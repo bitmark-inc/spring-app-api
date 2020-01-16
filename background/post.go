@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/protomodel"
 )
 
 func (b *BackgroundContext) extractPost(job *work.Job) (err error) {

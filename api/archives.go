@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bitmark-inc/fbm-apps/fbm-api/store"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/gin-gonic/gin"
 	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"

@@ -1,4 +1,4 @@
-module github.com/bitmark-inc/fbm-apps/fbm-api
+module github.com/bitmark-inc/spring-app-api
 
 go 1.13
 

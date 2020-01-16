@@ -1,3 +1,4 @@
 config.yaml
 deploy*.sh
 *.pem
+.DS_Store

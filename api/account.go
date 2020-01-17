@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/hex"
 	"net/http"
+	"strings"
 
 	"github.com/bitmark-inc/spring-app-api/store"
 	log "github.com/sirupsen/logrus"
@@ -26,7 +27,8 @@ func (s *Server) accountRegister(c *gin.Context) {
 	}
 
 	var params struct {
-		EncPubKey string `json:"enc_pub_key"`
+		EncPubKey string                 `json:"enc_pub_key"`
+		Metadata  map[string]interface{} `json:"metadata"`
 	}
 
 	if err := c.BindJSON(&params); err != nil {
@@ -50,7 +52,13 @@ func (s *Server) accountRegister(c *gin.Context) {
 		return
 	}
 
-	account, err = s.store.InsertAccount(c, accountNumber, encPubKey)
+	clientType := strings.ToLower(c.GetHeader("Client-Type"))
+	if params.Metadata == nil {
+		params.Metadata = make(map[string]interface{})
+	}
+
+	params.Metadata["platform"] = clientType
+	account, err = s.store.InsertAccount(c, accountNumber, encPubKey, params.Metadata)
 	if shouldInterupt(err, c) {
 		return
 	}

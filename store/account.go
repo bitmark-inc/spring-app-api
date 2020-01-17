@@ -10,13 +10,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte) (*Account, error) {
+func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*Account, error) {
 	var account Account
+
+	values := map[string]interface{}{
+		"account_number": accountNumber,
+		"enc_pub_key":    encPubKey,
+	}
+	if metadata != nil {
+		values["metadata"] = metadata
+	}
 
 	q := psql.
 		Insert("fbm.account").
-		Columns("account_number", "enc_pub_key").
-		Values(accountNumber, encPubKey).
+		SetMap(values).
 		Suffix("RETURNING *")
 
 	st, val, _ := q.ToSql()

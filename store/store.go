@@ -19,7 +19,7 @@ type Store interface {
 
 	// InsertAccount insert an account to the db with account number, alias and stripe's customer id
 	// returns an Account object.
-	InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte) (*Account, error)
+	InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*Account, error)
 
 	// QueryAccount query for an account with condition from account number OR alias
 	// leaves one of the condition empty to ignore.
@@ -44,7 +44,9 @@ type Store interface {
 	GetFBArchives(ctx context.Context, params *FBArchiveQueryParam) ([]FBArchive, error)
 
 	// Metrics
-	CountAccountCreation(ctx context.Context, from, to time.Time) (int, error)
+
+	// CountAccountCreation to count account creation for a specific time range
+	CountAccountCreation(ctx context.Context, from, to time.Time) (map[string]int, error)
 }
 
 // AccountQueryParam params for querying an account

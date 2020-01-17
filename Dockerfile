@@ -15,7 +15,7 @@ RUN go install github.com/bitmark-inc/spring-app-api
 
 FROM alpine:3.10.3
 ARG dist=0.0
-COPY --from=build /go/bin/fbm-api /
+COPY --from=build /go/bin/spring-app-api /
 
 COPY assets /assets
 
@@ -26,4 +26,4 @@ ENV FBM_SERVER_ASSETDIR=/assets
 ENV FBM_SERVER_COUNTRYCONTINENTMAP=/assets/country-continent-map.json
 ENV FBM_SERVER_AREAFBINCOMEMAP=/assets/area-fbincome-map.json
 
-CMD ["/fbm-api"]
+CMD ["/spring-app-api"]

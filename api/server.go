@@ -301,14 +301,15 @@ func (s *Server) healthz(c *gin.Context) {
 
 func (s *Server) information(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"information": map[string]map[string]interface{}{
+		"information": map[string]interface{}{
 			"server": map[string]interface{}{
 				"version":                viper.GetString("server.version"),
 				"enc_pub_key":            hex.EncodeToString(s.bitmarkAccount.EncrKey.PublicKeyBytes()),
 				"bitmark_account_number": s.bitmarkAccount.AccountNumber(),
 			},
-			"android": viper.GetStringMap("clients.android"),
-			"ios":     viper.GetStringMap("clients.ios"),
+			"android":        viper.GetStringMap("clients.android"),
+			"ios":            viper.GetStringMap("clients.ios"),
+			"system_version": "Spring 0.1",
 		},
 	})
 }

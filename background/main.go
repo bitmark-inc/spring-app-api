@@ -44,6 +44,7 @@ const (
 	jobAnalyzeSentiments        = "analyze_sentiments"
 	jobNotificationFinish       = "notification_finish_parsing"
 	jobRecurringlySubmitArchive = "recurringly_submit_archive"
+	jobExtractTimeMetadata      = "extract_time_metadata"
 )
 
 type BackgroundContext struct {
@@ -226,6 +227,9 @@ func main() {
 	pool.JobWithOptions(jobRecurringlySubmitArchive,
 		work.JobOptions{Priority: 1, MaxFails: 1},
 		b.recurringSubmitFBArchive)
+	pool.JobWithOptions(jobExtractTimeMetadata,
+		work.JobOptions{Priority: 1, MaxFails: 1},
+		b.extractTimeMetadata)
 
 	// Start processing jobs
 	pool.Start()

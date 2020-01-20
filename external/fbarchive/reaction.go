@@ -24,7 +24,11 @@ type ReactionResponse struct {
 
 // GetReactions calls the data source to get reaction data for an owner, returned reaction data and count
 func (c *Client) GetReactions(ctx context.Context, dataOwner, orderBy string, offset int64) ([]ReactionData, int64, error) {
-	queryPath := fmt.Sprintf("/reactions?data_owner=%s&order_by=%s&offset=%d&limit=10000", dataOwner, orderBy, offset)
+	return c.getReactions(ctx, dataOwner, orderBy, offset, 10000)
+}
+
+func (c *Client) getReactions(ctx context.Context, dataOwner, orderBy string, offset, limit int64) ([]ReactionData, int64, error) {
+	queryPath := fmt.Sprintf("/reactions?data_owner=%s&order_by=%s&offset=%d&limit=%d", dataOwner, orderBy, offset, limit)
 	req, err := c.createRequest(ctx, "GET", queryPath, make(map[string]string))
 
 	req.Header.Add("Content-Type", "application/json")
@@ -45,4 +49,18 @@ func (c *Client) GetReactions(ctx context.Context, dataOwner, orderBy string, of
 	}
 
 	return data.Results, data.Count, err
+}
+
+// GetLastReaction returns the very last reaction of this account
+func (c *Client) GetLastReaction(ctx context.Context, accountNumber string) (*ReactionData, error) {
+	reactions, _, err := c.getReactions(ctx, accountNumber, "des", 0, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(reactions) == 0 {
+		return nil, nil
+	}
+
+	return &reactions[0], nil
 }

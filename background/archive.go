@@ -142,6 +142,12 @@ func (b *BackgroundContext) checkArchive(job *work.Job) (err error) {
 			logEntity.Error(err)
 			return err
 		}
+
+		if _, err := enqueuer.EnqueueUnique(jobExtractTimeMetadata, work.Q{
+			"account_number": archives[0].AccountNumber,
+		}); err != nil {
+			return err
+		}
 	default:
 		// Retry after 10 minutes
 		log.Info("Retry after 10 minutes")
@@ -201,12 +207,11 @@ func (b *BackgroundContext) recurringSubmitFBArchive(job *work.Job) (err error) 
 	// Select first stored fbarchive from the list
 	archive := archives[0]
 
-	_, err = enqueuer.EnqueueUnique(jobUploadArchive, work.Q{
+	if _, err := enqueuer.EnqueueUnique(jobUploadArchive, work.Q{
 		"s3_key":         archive.S3Key,
 		"account_number": archive.AccountNumber,
 		"archive_id":     archive.ID,
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 

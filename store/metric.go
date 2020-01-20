@@ -9,19 +9,21 @@ import (
 )
 
 func (p *PGStore) CountAccountCreation(ctx context.Context, from, to time.Time) (map[string]int, error) {
-	q := psql.Select("count(*)").
-		From("fbm.account")
+	q := psql.Select("COUNT(DISTINCT(fbarchive.account_number))").
+		From("fbm.fbarchive AS fbarchive").
+		LeftJoin("fbm.account AS account ON fbarchive.account_number = account.account_number").
+		Where(sq.Eq{"fbarchive.processing_status": "processed"})
 
 	if !from.IsZero() {
-		q = q.Where(sq.GtOrEq{"created_at": from})
+		q = q.Where(sq.GtOrEq{"account.created_at": from})
 	}
 
 	if !to.IsZero() {
-		q = q.Where(sq.LtOrEq{"created_at": to})
+		q = q.Where(sq.LtOrEq{"account.created_at": to})
 	}
 
 	queryfunc := func(platform string) (int, error) {
-		finalQuery := q.Where(sq.Eq{"metadata->>'platform'": platform})
+		finalQuery := q.Where(sq.Eq{"account.metadata->>'platform'": platform})
 		st, val, _ := finalQuery.ToSql()
 		var count int
 		if err := p.pool.

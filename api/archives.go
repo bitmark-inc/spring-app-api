@@ -179,8 +179,56 @@ func (s *Server) adminForceParseArchive(c *gin.Context) {
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
+		if _, err := s.backgroundEnqueuer.EnqueueUnique("extract_time_metadata", work.Q{
+			"account_number": accountNumber,
+		}); err != nil {
+			log.Debug(err)
+			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+			return
+		}
 		log.Info("Enqueued job with id:", job.ID)
 		result[job.ID] = accountNumber
+	}
+
+	c.JSON(http.StatusAccepted, result)
+}
+
+func (s *Server) adminGenerateHashContent(c *gin.Context) {
+	var params struct {
+		Ids []int64 `json:"ids"`
+	}
+
+	if err := c.BindJSON(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	result := make(map[string]store.FBArchive)
+	for _, id := range params.Ids {
+		archives, err := s.store.GetFBArchives(c, &store.FBArchiveQueryParam{
+			ID: &id,
+		})
+		if len(archives) != 1 {
+			continue
+		}
+
+		archive := archives[0]
+		if archive.S3Key == "" {
+			continue
+		}
+
+		job, err := s.backgroundEnqueuer.EnqueueUnique("generate_hash_content", work.Q{
+			"s3_key":     archive.S3Key,
+			"archive_id": archive.ID,
+		})
+		if err != nil {
+			log.Debug(err)
+			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+			return
+		}
+		log.Info("Enqueued job with id:", job.ID)
+		result[job.ID] = archive
 	}
 
 	c.JSON(http.StatusAccepted, result)

@@ -18,10 +18,17 @@ func (b *BackgroundContext) extractTimeMetadata(job *work.Job) (err error) {
 
 	ctx := context.Background()
 
+	var lastPostTimestamp int64 = 0
+	var lastReactionTimestamp int64 = 0
+
 	// Get last post and reaction time.
 	lastPost, err := b.bitSocialClient.GetLastPost(ctx, accountNumber)
 	if err != nil {
 		return err
+	}
+
+	if lastPost != nil {
+		lastPostTimestamp = lastPost.Timestamp
 	}
 
 	lastReaction, err := b.bitSocialClient.GetLastReaction(ctx, accountNumber)
@@ -29,16 +36,20 @@ func (b *BackgroundContext) extractTimeMetadata(job *work.Job) (err error) {
 		return err
 	}
 
-	lastActivityTimestamp := lastPost.Timestamp
-	if lastActivityTimestamp < lastReaction.Timestamp {
-		lastActivityTimestamp = lastReaction.Timestamp
+	if lastReaction != nil {
+		lastPostTimestamp = lastReaction.Timestamp
+	}
+
+	lastActivityTimestamp := lastPostTimestamp
+	if lastActivityTimestamp < lastReactionTimestamp {
+		lastActivityTimestamp = lastReactionTimestamp
 	}
 
 	if _, err := b.store.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	}, map[string]interface{}{
-		"last_post_timestamp":     lastPost.Timestamp,
-		"last_reaction_timestamp": lastReaction.Timestamp,
+		"last_post_timestamp":     lastPostTimestamp,
+		"last_reaction_timestamp": lastReactionTimestamp,
 		"last_activity_timestamp": lastActivityTimestamp,
 	}); err != nil {
 		return err

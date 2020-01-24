@@ -192,6 +192,7 @@ func (s *Server) Run(addr string) error {
 		secretRoute.POST("/submit-archives", s.adminSubmitArchives)
 		secretRoute.POST("/parse-archives", s.adminForceParseArchive)
 		secretRoute.POST("/reanalyze", s.parseArchive)
+		secretRoute.POST("/generate-hash-content", s.adminGenerateHashContent)
 	}
 
 	metricRoute := r.Group("/metrics")
@@ -310,6 +311,7 @@ func (s *Server) information(c *gin.Context) {
 			"android":        viper.GetStringMap("clients.android"),
 			"ios":            viper.GetStringMap("clients.ios"),
 			"system_version": "Spring 0.1",
+			"docs":           viper.GetStringMap("docs"),
 		},
 	})
 }

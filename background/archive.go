@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
+	"io"
 	"io/ioutil"
 	"os"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/sha3"
 )
 
 func (b *BackgroundContext) submitArchive(job *work.Job) (err error) {
@@ -217,5 +220,67 @@ func (b *BackgroundContext) recurringSubmitFBArchive(job *work.Job) (err error) 
 
 	logEntity.WithField("archive", archive.S3Key).Info("Enqueue new fb archive")
 
+	return nil
+}
+
+func (b *BackgroundContext) generateHashContent(job *work.Job) (err error) {
+	defer jobEndCollectiveMetric(err, job)
+	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
+	s3key := job.ArgString("s3_key")
+	archiveid := job.ArgInt64("archive_id")
+	if err := job.ArgError(); err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	sess := session.New(b.awsConf)
+	downloader := s3manager.NewDownloader(sess)
+	h := sha3.New512()
+
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "fbarchives-*.zip")
+	if err != nil {
+		logEntity.Error(err)
+		return err
+	}
+
+	defer tmpFile.Close()
+	// Remember to clean up the file afterwards
+	defer os.Remove(tmpFile.Name())
+
+	_, err = downloader.Download(tmpFile,
+		&s3.GetObjectInput{
+			Bucket: aws.String(viper.GetString("aws.s3.bucket")),
+			Key:    aws.String(s3key),
+		})
+
+	if err != nil {
+		logEntity.Error(err)
+		return err
+	}
+
+	logEntity.Info("Downloaded zip file. Start computing fingerprint")
+	job.Checkin("Downloaded zip file. Start computing fingerprint")
+
+	io.Copy(h, tmpFile)
+
+	// Get fingerprint
+	fingerprintBytes := h.Sum(nil)
+	fingerprint := hex.EncodeToString(fingerprintBytes)
+
+	_, err = b.store.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
+		ID: &archiveid,
+	}, &store.FBArchiveQueryParam{
+		ContentHash: &fingerprint,
+	})
+	if err != nil {
+		logEntity.Error(err)
+		return err
+	}
+
+	logEntity.Info("Finish...")
+	enqueuer.EnqueueIn(jobPeriodicArchiveCheck, 120, map[string]interface{}{
+		"archive_id": archiveid,
+	})
 	return nil
 }

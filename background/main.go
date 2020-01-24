@@ -45,6 +45,7 @@ const (
 	jobNotificationFinish       = "notification_finish_parsing"
 	jobRecurringlySubmitArchive = "recurringly_submit_archive"
 	jobExtractTimeMetadata      = "extract_time_metadata"
+	jobGenerateHashContent      = "generate_hash_content"
 )
 
 type BackgroundContext struct {
@@ -201,10 +202,10 @@ func main() {
 
 	// Map the name of jobs to handler functions
 	pool.JobWithOptions(jobDownloadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1},
+		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
 		b.downloadArchive)
 	pool.JobWithOptions(jobUploadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1},
+		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
 		b.submitArchive)
 	pool.JobWithOptions(jobExtract,
 		work.JobOptions{Priority: 10, MaxFails: 1},
@@ -230,6 +231,9 @@ func main() {
 	pool.JobWithOptions(jobExtractTimeMetadata,
 		work.JobOptions{Priority: 1, MaxFails: 1},
 		b.extractTimeMetadata)
+	pool.JobWithOptions(jobGenerateHashContent,
+		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
+		b.generateHashContent)
 
 	// Start processing jobs
 	pool.Start()
@@ -275,6 +279,7 @@ func jobEndCollectiveMetric(err error, job *work.Job) error {
 	currentProcessingGaugeVec.WithLabelValues(job.Name).Dec()
 	if err != nil {
 		totalFailedCounterVec.WithLabelValues(job.Name).Inc()
+		sentry.CaptureException(err)
 	} else {
 		totalSuccessfulCounterVec.WithLabelValues(job.Name).Inc()
 	}

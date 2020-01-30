@@ -175,18 +175,24 @@ func (s *Server) recognizeAccountMiddleware() gin.HandlerFunc {
 
 func (s *Server) clientVersionGateway() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientType := c.GetHeader("Client-Type")
-		clientVersion := c.GetHeader("Client-Version")
-		code, err := strconv.Atoi(clientVersion)
-		if err != nil ||
-			(clientType != "ios" && clientType != "android") ||
-			code <= 0 {
+		var params struct {
+			ClientType    string `header:"Client-Type" binding:"required"`
+			ClientVersion int    `header:"Client-Version" binding:"required"`
+		}
+
+		if err := c.ShouldBindHeader(&params); err != nil {
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
 
-		clientMinimumVersion := viper.GetInt("clients." + clientType + ".minimum_client_version")
-		if code < clientMinimumVersion {
+		if (params.ClientType != "ios" && params.ClientType != "android") ||
+			params.ClientVersion <= 0 {
+			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+			return
+		}
+
+		clientMinimumVersion := viper.GetInt("clients." + params.ClientType + ".minimum_client_version")
+		if params.ClientVersion < clientMinimumVersion {
 			abortWithEncoding(c, http.StatusNotAcceptable, errorUnsupportedClientVersion)
 			return
 		}

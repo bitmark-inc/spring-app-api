@@ -103,6 +103,27 @@ func (s *Server) Run(addr string) error {
 		}
 	}()
 
+	c, err := loadCountryContinentMap()
+	if err != nil {
+		return err
+	}
+	s.countryContinentMap = c
+
+	incomeMap, err := loadFBIncomeMap()
+	if err != nil {
+		return err
+	}
+	s.areaFBIncomeMap = incomeMap
+
+	s.server = &http.Server{
+		Addr:    addr,
+		Handler: s.setupRouter(),
+	}
+
+	return s.server.ListenAndServe()
+}
+
+func (s *Server) setupRouter() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(sentrygin.New(sentrygin.Options{
@@ -212,26 +233,7 @@ func (s *Server) Run(addr string) error {
 
 	r.GET("/healthz", s.healthz)
 
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: r,
-	}
-
-	s.server = srv
-
-	c, err := loadCountryContinentMap()
-	if err != nil {
-		return err
-	}
-	s.countryContinentMap = c
-
-	incomeMap, err := loadFBIncomeMap()
-	if err != nil {
-		return err
-	}
-	s.areaFBIncomeMap = incomeMap
-
-	return srv.ListenAndServe()
+	return r
 }
 
 func loadCountryContinentMap() (map[string]string, error) {
@@ -288,8 +290,8 @@ func (s *Server) healthz(c *gin.Context) {
 
 	// Check status of bitSocial client
 	if !s.bitSocialClient.IsReady() {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "booting up",
+		c.JSON(http.StatusBadGateway, gin.H{
+			"status": "bit social error",
 		})
 		return
 	}

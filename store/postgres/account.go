@@ -2,13 +2,11 @@ package postgres
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v4"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/bitmark-inc/spring-app-api/store"
-	"github.com/google/uuid"
 )
 
 func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*store.Account, error) {
@@ -121,66 +119,4 @@ func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *store.Accou
 	}
 
 	return nil, nil
-}
-
-func (p *PGStore) AddToken(ctx context.Context, accountNumber string, info map[string]interface{}, expire time.Duration) (*store.Token, error) {
-	tokenString := uuid.New().String()
-
-	q := psql.
-		Insert("fbm.token").
-		Columns("id", "account_number", "info", "expired_at").
-		Values(tokenString, accountNumber, info, time.Now().Add(expire)).
-		Suffix("RETURNING *")
-
-	st, val, _ := q.ToSql()
-
-	var token store.Token
-	if err := p.pool.
-		QueryRow(ctx, st, val...).
-		Scan(&token.Token,
-			&token.AccountNumber,
-			&token.Info,
-			&token.CreatedAt,
-			&token.ExpireAt); err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return &token, nil
-}
-
-func (p *PGStore) UseToken(ctx context.Context, token string) (*store.Account, map[string]interface{}, error) {
-	var accountNumber string
-	var info map[string]interface{}
-
-	q := psql.
-		Delete("fbm.token").
-		Where(sq.Eq{"id": token}).
-		Where(sq.GtOrEq{"expired_at": time.Now()}).
-		Suffix("RETURNING account_number, info")
-
-	st, val, _ := q.ToSql()
-
-	if err := p.pool.
-		QueryRow(ctx, st, val...).
-		Scan(&accountNumber,
-			&info); err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil, nil
-		}
-
-		return nil, nil, err
-	}
-
-	account, err := p.QueryAccount(ctx, &store.AccountQueryParam{
-		AccountNumber: &accountNumber,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return account, info, nil
 }

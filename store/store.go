@@ -28,12 +28,6 @@ type Store interface {
 	// UpdateAccountMetadata to update account with metadata
 	UpdateAccountMetadata(ctx context.Context, params *AccountQueryParam, metadata map[string]interface{}) (*Account, error)
 
-	// AddToken to add a random token represent to an account for validating something
-	AddToken(ctx context.Context, accountNumber string, info map[string]interface{}, expire time.Duration) (*Token, error)
-
-	// UseToken to consume a token and
-	UseToken(ctx context.Context, token string) (*Account, map[string]interface{}, error)
-
 	// AddFBArchive to add an archive record from an account
 	AddFBArchive(ctx context.Context, accountNumber string, starting, ending time.Time) (*FBArchive, error)
 

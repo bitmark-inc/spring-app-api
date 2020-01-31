@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,21 +22,37 @@ func Test_AccountMetric(t *testing.T) {
 	assert.Equal(t, 0, metricMap["ios"])
 	assert.Equal(t, 0, metricMap["android"])
 
+	iosAccountNumber := "ios_account"
+	androidAccountNumber := "android_account"
+
 	// Insert account with null public account number and metadata
-	account, err := s.InsertAccount(ctx, "ios_account", nil, map[string]interface{}{
+	account, err := s.InsertAccount(ctx, iosAccountNumber, nil, map[string]interface{}{
 		"platform": "ios",
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
-	account, err = s.InsertAccount(ctx, "android_account", nil, map[string]interface{}{
+	account, err = s.InsertAccount(ctx, androidAccountNumber, nil, map[string]interface{}{
 		"platform": "android",
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
+	// Insert fb archives
+	archive, err := s.AddFBArchive(ctx, iosAccountNumber, time.Now(), time.Now())
+	assert.NoError(t, err)
+	assert.NotNil(t, archive)
+
+	archives, err := s.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
+		AccountNumber: &iosAccountNumber,
+	}, &store.FBArchiveQueryParam{
+		Status: &store.FBArchiveStatusProcessed,
+	})
+	assert.NoError(t, err)
+	assert.Len(t, archives, 1)
+
 	metricMap, err = s.CountAccountCreation(ctx, time.Now().Add(0-time.Hour), time.Now())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, metricMap["ios"])
-	assert.Equal(t, 1, metricMap["android"])
+	assert.Equal(t, 0, metricMap["android"])
 }

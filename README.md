@@ -1,5 +1,5 @@
 # Spring API server
----
+[![Build Status](https://travis-ci.org/bitmark-inc/spring-app-api.svg?branch=master)](https://travis-ci.org/bitmark-inc/spring-app-api)
 ## Prequisites
 - Go 1.13
 

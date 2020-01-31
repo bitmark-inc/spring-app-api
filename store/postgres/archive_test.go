@@ -36,17 +36,17 @@ func Test_FBArchive(t *testing.T) {
 	contentHash := "hash"
 	taskID := "task_id"
 
-	_, err = s.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
+	archives, err := s.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
 		ID:    &archive.ID,
 		S3Key: &archive.S3Key,
 	}, &store.FBArchiveQueryParam{
 		Status: &wrongStatus,
 	})
-	assert.Error(t, err)
+	assert.Len(t, archives, 0)
 
 	correctID := archive.ID
 
-	archives, err := s.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
+	archives, err = s.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
 		ID:    &correctID,
 		S3Key: &archive.S3Key,
 	}, &store.FBArchiveQueryParam{

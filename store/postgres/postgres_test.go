@@ -20,9 +20,6 @@ func loadTestConfig() {
 
 func Test_PostgresEngine(t *testing.T) {
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	_, err := NewPGStore(ctx)
-	assert.Error(t, err)
-
 	loadTestConfig()
 
 	s, err := NewPGStore(ctx)

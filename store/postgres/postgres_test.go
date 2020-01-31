@@ -23,12 +23,12 @@ func Test_PostgresEngine(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	s, err := NewPGStore(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, s)
 
 	err = s.Ping(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = s.Close(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

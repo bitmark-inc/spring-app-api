@@ -57,10 +57,6 @@ func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *store.FBArc
 		q = q.Where(sq.Eq{"file_key": *params.S3Key})
 	}
 
-	if values.S3Key != nil {
-		q = q.Set("file_key", *values.S3Key)
-	}
-
 	if values.Status != nil {
 		q = q.Set("processing_status", *values.Status)
 	}

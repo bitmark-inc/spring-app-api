@@ -23,21 +23,21 @@ func Test_InsertAccount(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	s, err := NewPGStore(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, s)
 
 	// Insert account with null public account number and metadata
 	account, err := s.InsertAccount(ctx, testAccountNumber1, nil, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
 	// Insert with the same account
 	account, err = s.InsertAccount(ctx, testAccountNumber1, nil, nil)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	// Insert with metadata
 	account, err = s.InsertAccount(ctx, testAccountNumber2, nil, metadataData)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
 	// Query account again
@@ -54,12 +54,12 @@ func Test_UpdateAccountMetadata(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	s, err := NewPGStore(ctx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, s)
 
 	// Insert account with null public account number and metadata
 	account, err := s.InsertAccount(ctx, testAccountNumber3, nil, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, account)
 
 	account2, err := s.UpdateAccountMetadata(ctx, &store.AccountQueryParam{

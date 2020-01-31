@@ -35,3 +35,10 @@ type FBArchive struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
+
+// FbData represent a statistic record for Facebook data that will be push to dynamodb
+type FbData struct {
+	Key       string `dynamodbav:"key"`
+	Timestamp int64  `dynamodbav:"timestamp"`
+	Data      []byte `dynamodbav:"data"`
+}

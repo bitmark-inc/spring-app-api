@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bitmark-inc/spring-app-api/logmodule"
+	"github.com/bitmark-inc/spring-app-api/store"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4"
@@ -19,7 +20,7 @@ const (
 
 // PGStore will store on postgres
 type PGStore struct {
-	Store
+	store.Store
 	pool *pgxpool.Pool
 }
 

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -12,16 +13,9 @@ import (
 )
 
 type DynamoDBStore struct {
-	FBDataStore
+	store.FBDataStore
 	table *string
 	svc   *dynamodb.DynamoDB
-}
-
-// FbData represent a statistic record for Facebook data that will be push to dynamodb
-type FbData struct {
-	Key       string `dynamodbav:"key"`
-	Timestamp int64  `dynamodbav:"timestamp"`
-	Data      []byte `dynamodbav:"data"`
 }
 
 func NewDynamoDBStore(config *aws.Config, tablename string) (*DynamoDBStore, error) {
@@ -40,7 +34,7 @@ func NewDynamoDBStore(config *aws.Config, tablename string) (*DynamoDBStore, err
 }
 
 func (d *DynamoDBStore) AddFBStat(ctx context.Context, key string, timestamp int64, value []byte) error {
-	info := FbData{
+	info := store.FbData{
 		Key:       key,
 		Timestamp: timestamp,
 		Data:      value,
@@ -60,7 +54,7 @@ func (d *DynamoDBStore) AddFBStat(ctx context.Context, key string, timestamp int
 }
 
 // AddFBStats will push all of the statistic records in stats array to dynamo DB
-func (d *DynamoDBStore) AddFBStats(ctx context.Context, data []FbData) error {
+func (d *DynamoDBStore) AddFBStats(ctx context.Context, data []store.FbData) error {
 	if len(data) > 25 {
 		return errors.New("can not push more than 25 records at once for dynamodb")
 	}
@@ -96,7 +90,7 @@ func (d *DynamoDBStore) queryFBStatResult(input *dynamodb.QueryInput) ([][]byte,
 		return nil, err
 	}
 
-	var items []FbData
+	var items []store.FbData
 
 	if err := dynamodbattribute.UnmarshalListOfMaps(result.Items, &items); err != nil {
 		return nil, err
@@ -168,7 +162,7 @@ func (d *DynamoDBStore) GetExactFBStat(ctx context.Context, key string, in int64
 		return nil, err
 	}
 
-	var items []FbData
+	var items []store.FbData
 
 	if err := dynamodbattribute.UnmarshalListOfMaps(result.Items, &items); err != nil {
 		return nil, err

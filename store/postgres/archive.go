@@ -5,12 +5,13 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/jackc/pgx/v4"
 )
 
 // AddFBArchive to add an archive record from an account
-func (p *PGStore) AddFBArchive(ctx context.Context, accountNumber string, starting, ending time.Time) (*FBArchive, error) {
-	var fbArchive FBArchive
+func (p *PGStore) AddFBArchive(ctx context.Context, accountNumber string, starting, ending time.Time) (*store.FBArchive, error) {
+	var fbArchive store.FBArchive
 
 	q := psql.
 		Insert("fbm.fbarchive").
@@ -43,7 +44,7 @@ func (p *PGStore) AddFBArchive(ctx context.Context, accountNumber string, starti
 }
 
 // UpdateFBArchiveStatus to update status for a particular fb archive record with s3 key
-func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *FBArchiveQueryParam, values *FBArchiveQueryParam) ([]FBArchive, error) {
+func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *store.FBArchiveQueryParam, values *store.FBArchiveQueryParam) ([]store.FBArchive, error) {
 	q := psql.Update("fbm.fbarchive").
 		Set("updated_at", time.Now()).
 		Suffix("RETURNING id, account_number, file_key, starting_time, ending_time, analyzed_task_id, content_hash, processing_status, created_at, updated_at")
@@ -79,10 +80,10 @@ func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *FBArchiveQu
 		return nil, err
 	}
 
-	fbarchives := make([]FBArchive, 0)
+	fbarchives := make([]store.FBArchive, 0)
 
 	for rows.Next() {
-		var fbArchive FBArchive
+		var fbArchive store.FBArchive
 
 		if rows.Scan(&fbArchive.ID,
 			&fbArchive.AccountNumber,
@@ -103,7 +104,7 @@ func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *FBArchiveQu
 	return fbarchives, nil
 }
 
-func (p *PGStore) GetFBArchives(ctx context.Context, params *FBArchiveQueryParam) ([]FBArchive, error) {
+func (p *PGStore) GetFBArchives(ctx context.Context, params *store.FBArchiveQueryParam) ([]store.FBArchive, error) {
 	q := psql.Select("id, account_number, file_key, starting_time, ending_time, analyzed_task_id, content_hash, processing_status, created_at, updated_at").
 		From("fbm.fbarchive")
 
@@ -130,10 +131,10 @@ func (p *PGStore) GetFBArchives(ctx context.Context, params *FBArchiveQueryParam
 		return nil, err
 	}
 
-	fbarchives := make([]FBArchive, 0)
+	fbarchives := make([]store.FBArchive, 0)
 
 	for rows.Next() {
-		var fbArchive FBArchive
+		var fbArchive store.FBArchive
 
 		if rows.Scan(&fbArchive.ID,
 			&fbArchive.AccountNumber,

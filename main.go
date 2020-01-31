@@ -18,7 +18,9 @@ import (
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
 	"github.com/bitmark-inc/spring-app-api/api"
 	"github.com/bitmark-inc/spring-app-api/logmodule"
-	"github.com/bitmark-inc/spring-app-api/store"
+	store "github.com/bitmark-inc/spring-app-api/store"
+	dynamodb "github.com/bitmark-inc/spring-app-api/store/dynamodb"
+	postgres "github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
@@ -171,7 +173,7 @@ func main() {
 	log.WithField("prefix", "init").Info("Loaded global jwt key")
 
 	// Init db
-	pgstore, err := store.NewPGStore(initialCtx)
+	pgstore, err := postgres.NewPGStore(initialCtx)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -190,7 +192,7 @@ func main() {
 
 	var enqueuer = work.NewEnqueuer("fbm", redisPool)
 
-	dynamodbStore, err := store.NewDynamoDBStore(awsConf, viper.GetString("aws.dynamodb.table"))
+	dynamodbStore, err := dynamodb.NewDynamoDBStore(awsConf, viper.GetString("aws.dynamodb.table"))
 	if err != nil {
 		log.Panic(err)
 	}

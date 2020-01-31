@@ -7,11 +7,12 @@ import (
 	"github.com/jackc/pgx/v4"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/google/uuid"
 )
 
-func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*Account, error) {
-	var account Account
+func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*store.Account, error) {
+	var account store.Account
 
 	values := map[string]interface{}{
 		"account_number": accountNumber,
@@ -45,7 +46,7 @@ func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPu
 	return &account, nil
 }
 
-func (p *PGStore) QueryAccount(ctx context.Context, params *AccountQueryParam) (*Account, error) {
+func (p *PGStore) QueryAccount(ctx context.Context, params *store.AccountQueryParam) (*store.Account, error) {
 	q := psql.Select("*").From("fbm.account")
 
 	if params.AccountNumber != nil {
@@ -53,7 +54,7 @@ func (p *PGStore) QueryAccount(ctx context.Context, params *AccountQueryParam) (
 	}
 
 	st, val, _ := q.ToSql()
-	var account Account
+	var account store.Account
 
 	if err := p.pool.
 		QueryRow(ctx, st, val...).
@@ -72,7 +73,7 @@ func (p *PGStore) QueryAccount(ctx context.Context, params *AccountQueryParam) (
 	return &account, nil
 }
 
-func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *AccountQueryParam, metadata map[string]interface{}) (*Account, error) {
+func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *store.AccountQueryParam, metadata map[string]interface{}) (*store.Account, error) {
 	q1 := psql.Select("*").From("fbm.account")
 
 	if params.AccountNumber != nil {
@@ -80,7 +81,7 @@ func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *AccountQuer
 	}
 
 	st, val, _ := q1.ToSql()
-	var account Account
+	var account store.Account
 
 	if err := p.pool.
 		QueryRow(ctx, st, val...).
@@ -118,7 +119,7 @@ func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *AccountQuer
 	return nil, nil
 }
 
-func (p *PGStore) AddToken(ctx context.Context, accountNumber string, info map[string]interface{}, expire time.Duration) (*Token, error) {
+func (p *PGStore) AddToken(ctx context.Context, accountNumber string, info map[string]interface{}, expire time.Duration) (*store.Token, error) {
 	tokenString := uuid.New().String()
 
 	q := psql.
@@ -129,7 +130,7 @@ func (p *PGStore) AddToken(ctx context.Context, accountNumber string, info map[s
 
 	st, val, _ := q.ToSql()
 
-	var token Token
+	var token store.Token
 	if err := p.pool.
 		QueryRow(ctx, st, val...).
 		Scan(&token.Token,
@@ -147,7 +148,7 @@ func (p *PGStore) AddToken(ctx context.Context, accountNumber string, info map[s
 	return &token, nil
 }
 
-func (p *PGStore) UseToken(ctx context.Context, token string) (*Account, map[string]interface{}, error) {
+func (p *PGStore) UseToken(ctx context.Context, token string) (*store.Account, map[string]interface{}, error) {
 	var accountNumber string
 	var info map[string]interface{}
 
@@ -170,7 +171,7 @@ func (p *PGStore) UseToken(ctx context.Context, token string) (*Account, map[str
 		return nil, nil, err
 	}
 
-	account, err := p.QueryAccount(ctx, &AccountQueryParam{
+	account, err := p.QueryAccount(ctx, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	})
 	if err != nil {

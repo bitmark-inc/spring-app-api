@@ -22,7 +22,7 @@ env:
     - PGVERSION=10
 
 before_script:
-  - cp ./travis/test_conf.yaml /.config/config.yaml
+  - mkdir -p /.config && cp ./travis/test_conf.yaml /.config/config.yaml
   - ./travis/before_script.bash
 
 script:

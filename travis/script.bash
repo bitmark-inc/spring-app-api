@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
 set -eux
 
-if [ "${PGVERSION-}" != "" ]
-then
-  go test -v -race ./...
-fi
+go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...

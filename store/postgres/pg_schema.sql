@@ -2,7 +2,6 @@
 
 -- note: the install-schema will use the password from etc/fbm.conf
 --       in place of the tag below when loading this file into the database
-CREATE USER fbm ENCRYPTED PASSWORD '@CHANGE-TO-SECURE-PASSWORD@';
 -- connect to the database
 \connect fbm
 

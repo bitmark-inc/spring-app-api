@@ -1,0 +1,30 @@
+language: go
+
+go:
+  - 1.11.x
+  - 1.12.x
+  - master
+
+sudo: true
+
+# Derived from https://github.com/lib/pq/blob/master/.travis.yml
+before_install:
+  - ./travis/before_install.bash
+
+env:
+  global:
+    - GO111MODULE=on
+    # Global app config:
+    - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
+
+  matrix:
+    - PGVERSION=12
+    - PGVERSION=11
+    - PGVERSION=10
+
+before_script:
+  - cp ./travis/test_conf.yaml /.config/config.yaml
+  - ./travis/before_script.bash
+
+script:
+  - ./travis/script.bash

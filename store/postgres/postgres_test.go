@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,6 +15,7 @@ func loadTestConfig() {
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("fbm")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	log.SetLevel(log.DebugLevel)
 }
 
 func Test_PostgresEngine(t *testing.T) {

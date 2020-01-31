@@ -28,6 +28,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/viper v1.5.0
+	github.com/stretchr/testify v1.4.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

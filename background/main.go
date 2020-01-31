@@ -18,6 +18,8 @@ import (
 	"github.com/bitmark-inc/spring-app-api/external/geoservice"
 	"github.com/bitmark-inc/spring-app-api/external/onesignal"
 	"github.com/bitmark-inc/spring-app-api/store"
+	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
+	"github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
 	"github.com/gomodule/redigo/redis"
@@ -132,7 +134,7 @@ func main() {
 		HTTPClient: httpClient,
 	}
 
-	dynamodbStore, err := store.NewDynamoDBStore(awsConf, viper.GetString("aws.dynamodb.table"))
+	dynamodbStore, err := dynamodb.NewDynamoDBStore(awsConf, viper.GetString("aws.dynamodb.table"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -163,7 +165,7 @@ func main() {
 	}(bitSocialClient)
 
 	// Init db
-	pgstore, err := store.NewPGStore(context.Background())
+	pgstore, err := postgres.NewPGStore(context.Background())
 	if err != nil {
 		log.Panic(err)
 	}

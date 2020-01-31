@@ -14,6 +14,10 @@ import (
 func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPubKey []byte, metadata map[string]interface{}) (*store.Account, error) {
 	var account store.Account
 
+	if encPubKey == nil {
+		encPubKey = []byte{}
+	}
+
 	values := map[string]interface{}{
 		"account_number": accountNumber,
 		"enc_pub_key":    encPubKey,

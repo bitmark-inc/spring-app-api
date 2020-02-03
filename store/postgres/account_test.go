@@ -95,9 +95,9 @@ func Test_NoAccount(t *testing.T) {
 	assert.Nil(t, account)
 
 	// Update with wrong account
-	accounts, err := s.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
+	account, err = s.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
 		AccountNumber: &wrongAccountNumber,
 	}, nil)
 	assert.NoError(t, err)
-	assert.Len(t, accounts, 0)
+	assert.Nil(t, account)
 }

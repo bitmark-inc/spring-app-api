@@ -53,6 +53,10 @@ func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *store.FBArc
 		q = q.Where(sq.Eq{"id": *params.ID})
 	}
 
+	if params.AccountNumber != nil {
+		q = q.Where(sq.Eq{"account_number": *params.AccountNumber})
+	}
+
 	if params.S3Key != nil {
 		q = q.Where(sq.Eq{"file_key": *params.S3Key})
 	}

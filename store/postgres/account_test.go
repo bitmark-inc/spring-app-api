@@ -76,3 +76,28 @@ func Test_UpdateAccountMetadata(t *testing.T) {
 	assert.Equal(t, metadataData, account3.Metadata)
 
 }
+
+func Test_NoAccount(t *testing.T) {
+	loadTestConfig()
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	s, err := NewPGStore(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	wrongAccountNumber := "wrong_account_number"
+
+	// Query account with wrong account number
+	account, err := s.QueryAccount(ctx, &store.AccountQueryParam{
+		AccountNumber: &wrongAccountNumber,
+	})
+	assert.NoError(t, err)
+	assert.Nil(t, account)
+
+	// Update with wrong account
+	accounts, err := s.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
+		AccountNumber: &wrongAccountNumber,
+	}, nil)
+	assert.NoError(t, err)
+	assert.Len(t, accounts, 0)
+}

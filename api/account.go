@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bitmark-inc/spring-app-api/store"
+	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
@@ -115,4 +116,50 @@ func (s *Server) accountUpdateMetadata(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": account})
+}
+
+func (s *Server) accountDelete(c *gin.Context) {
+	account := c.MustGet("account").(*store.Account)
+
+	job, err := s.backgroundEnqueuer.EnqueueUnique("delete_user_data", work.Q{
+		"account_number": account.AccountNumber,
+	})
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+	log.Info("Enqueued job with id:", job.ID)
+
+	// Return success
+	c.JSON(http.StatusOK, gin.H{"result": "OK"})
+}
+
+func (s *Server) adminAccountDelete(c *gin.Context) {
+	var params struct {
+		AccountNumbers []string `json:"account_numbers"`
+	}
+
+	if err := c.BindJSON(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	result := make(map[string]string)
+	for _, accountNumber := range params.AccountNumbers {
+		job, err := s.backgroundEnqueuer.EnqueueUnique("delete_user_data", work.Q{
+			"account_number": accountNumber,
+		})
+		if err != nil {
+			log.Debug(err)
+			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+			return
+		}
+		log.Info("Enqueued job with id:", job.ID)
+		result[job.ID] = accountNumber
+	}
+
+	// Return success
+	c.JSON(http.StatusOK, gin.H{"result": result})
 }

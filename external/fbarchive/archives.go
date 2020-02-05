@@ -60,6 +60,27 @@ func (c *Client) NewDataOwner(ctx context.Context, publicKey string) error {
 	return errors.New("error when creating data owner")
 }
 
+func (c *Client) DeleteDataOwner(ctx context.Context, publicKey string) error {
+	r, _ := c.createRequest(ctx, http.MethodDelete, "/data_owners/"+publicKey, nil)
+	resp, err := c.httpClient.Do(r)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode < 300 {
+		return nil
+	}
+
+	// Print out the response in console log
+	dumpBytes, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Error(err)
+	}
+	log.WithContext(ctx).WithField("prefix", "fbarchive").WithField("resp", string(dumpBytes)).Debug("response from bitsocial server")
+
+	return errors.New("error when deleting data owner")
+}
+
 func (c *Client) UploadArchives(ctx context.Context, file *os.File, dataOwner string) (string, error) {
 	defer file.Close()
 

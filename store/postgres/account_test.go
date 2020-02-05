@@ -101,3 +101,37 @@ func Test_NoAccount(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, account)
 }
+
+func Test_DeleteAccount(t *testing.T) {
+	loadTestConfig()
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	s, err := NewPGStore(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, s)
+
+	deletingAccountNumber := "deleting_account_number"
+
+	// Insert account with null public account number and metadata
+	account, err := s.InsertAccount(ctx, deletingAccountNumber, nil, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, account)
+
+	// Query again if the insertion was successful
+	account2, err := s.QueryAccount(ctx, &store.AccountQueryParam{
+		AccountNumber: &deletingAccountNumber,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, account2)
+
+	// Delete account
+	err = s.DeleteAccount(ctx, deletingAccountNumber)
+	assert.NoError(t, err)
+
+	// Query again if the deletion was successful
+	account3, err := s.QueryAccount(ctx, &store.AccountQueryParam{
+		AccountNumber: &deletingAccountNumber,
+	})
+	assert.NoError(t, err)
+	assert.Nil(t, account3)
+}

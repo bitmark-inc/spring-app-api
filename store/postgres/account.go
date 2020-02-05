@@ -120,3 +120,16 @@ func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *store.Accou
 
 	return nil, nil
 }
+
+func (p *PGStore) DeleteAccount(ctx context.Context, accountNumber string) error {
+	q := psql.
+		Delete("fbm.account").
+		Where(sq.Eq{"account_number": accountNumber})
+
+	st, val, _ := q.ToSql()
+
+	_, err := p.pool.
+		Exec(ctx, st, val...)
+
+	return err
+}

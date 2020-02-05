@@ -28,6 +28,9 @@ type Store interface {
 	// UpdateAccountMetadata to update account with metadata
 	UpdateAccountMetadata(ctx context.Context, params *AccountQueryParam, metadata map[string]interface{}) (*Account, error)
 
+	// DeleteAccount to delete account with account number
+	DeleteAccount(ctx context.Context, accountNumber string) error
+
 	// AddFBArchive to add an archive record from an account
 	AddFBArchive(ctx context.Context, accountNumber string, starting, ending time.Time) (*FBArchive, error)
 
@@ -94,4 +97,7 @@ type FBDataStore interface {
 
 	// GetExactFBStat to get a FB stat exactly in timestamp
 	GetExactFBStat(ctx context.Context, key string, in int64) ([]byte, error)
+
+	// RemoveFBStat to delete fb stat with specific key and with any timestamp >= 0
+	RemoveFBStat(ctx context.Context, key string) error
 }

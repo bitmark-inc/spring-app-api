@@ -17,6 +17,7 @@ import (
 	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
 	"github.com/bitmark-inc/spring-app-api/external/geoservice"
 	"github.com/bitmark-inc/spring-app-api/external/onesignal"
+	"github.com/bitmark-inc/spring-app-api/logmodule"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
@@ -48,6 +49,7 @@ const (
 	jobRecurringlySubmitArchive = "recurringly_submit_archive"
 	jobExtractTimeMetadata      = "extract_time_metadata"
 	jobGenerateHashContent      = "generate_hash_content"
+	jobDeleteUserData           = "delete_user_data"
 )
 
 type BackgroundContext struct {
@@ -131,6 +133,7 @@ func main() {
 
 	awsConf := &aws.Config{
 		Region:     aws.String(viper.GetString("aws.region")),
+		Logger:     &logmodule.AWSLog{},
 		HTTPClient: httpClient,
 	}
 
@@ -236,6 +239,9 @@ func main() {
 	pool.JobWithOptions(jobGenerateHashContent,
 		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
 		b.generateHashContent)
+	pool.JobWithOptions(jobDeleteUserData,
+		work.JobOptions{Priority: 10, MaxFails: 1},
+		b.deleteUserData)
 
 	// Start processing jobs
 	pool.Start()
@@ -281,6 +287,8 @@ func jobEndCollectiveMetric(err error, job *work.Job) error {
 	currentProcessingGaugeVec.WithLabelValues(job.Name).Dec()
 	if err != nil {
 		totalFailedCounterVec.WithLabelValues(job.Name).Inc()
+		logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
+		logEntity.Error(err)
 		sentry.CaptureException(err)
 	} else {
 		totalSuccessfulCounterVec.WithLabelValues(job.Name).Inc()

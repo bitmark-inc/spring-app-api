@@ -154,6 +154,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	{
 		accountRoute.GET("/:account_number", s.accountDetail)
 		accountRoute.PATCH("/:account_number", s.accountUpdateMetadata)
+		accountRoute.DELETE("/:account_number", s.accountDelete)
 	}
 
 	archivesRoute := apiRoute.Group("/archives")
@@ -214,6 +215,7 @@ func (s *Server) setupRouter() *gin.Engine {
 		secretRoute.POST("/parse-archives", s.adminForceParseArchive)
 		secretRoute.POST("/reanalyze", s.parseArchive)
 		secretRoute.POST("/generate-hash-content", s.adminGenerateHashContent)
+		secretRoute.POST("/delete-accounts", s.adminAccountDelete)
 	}
 
 	metricRoute := r.Group("/metrics")

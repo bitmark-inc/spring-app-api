@@ -42,9 +42,11 @@ func (c *Client) createRequest(ctx context.Context, method, path string, body ma
 	}
 
 	buf := &bytes.Buffer{}
-	encoder := json.NewEncoder(buf)
-	if err := encoder.Encode(body); err != nil {
-		return nil, err
+	if body != nil {
+		encoder := json.NewEncoder(buf)
+		if err := encoder.Encode(body); err != nil {
+			return nil, err
+		}
 	}
 
 	fullurl := c.endpoint + path

@@ -3,13 +3,16 @@ package dynamodb
 import (
 	"context"
 	"errors"
-	"github.com/bitmark-inc/spring-app-api/store"
 	"strconv"
+
+	"github.com/bitmark-inc/spring-app-api/store"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type DynamoDBStore struct {
@@ -173,4 +176,38 @@ func (d *DynamoDBStore) GetExactFBStat(ctx context.Context, key string, in int64
 	}
 
 	return items[0].Data, nil
+}
+
+func (d *DynamoDBStore) RemoveFBStat(ctx context.Context, key string) error {
+	input := &dynamodb.QueryInput{
+		TableName: d.table,
+		KeyConditions: map[string]*dynamodb.Condition{
+			"key": {
+				ComparisonOperator: aws.String("EQ"),
+				AttributeValueList: []*dynamodb.AttributeValue{
+					{
+						S: aws.String(key),
+					},
+				},
+			},
+		},
+	}
+
+	result, err := d.svc.Query(input)
+	if err != nil {
+		return err
+	}
+
+	for _, k := range result.Items {
+		delete(k, "data")
+		log.Debug(k)
+		if _, err := d.svc.DeleteItem(&dynamodb.DeleteItemInput{
+			Key:       k,
+			TableName: d.table,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

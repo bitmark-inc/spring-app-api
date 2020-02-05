@@ -37,17 +37,16 @@ var (
 )
 
 const (
-	jobDownloadArchive          = "download_archive"
-	jobExtract                  = "extract_zip"
-	jobUploadArchive            = "upload_archive"
-	jobPeriodicArchiveCheck     = "periodic_archive_check"
-	jobAnalyzePosts             = "analyze_posts"
-	jobAnalyzeReactions         = "analyze_reactions"
-	jobAnalyzeSentiments        = "analyze_sentiments"
-	jobNotificationFinish       = "notification_finish_parsing"
-	jobRecurringlySubmitArchive = "recurringly_submit_archive"
-	jobExtractTimeMetadata      = "extract_time_metadata"
-	jobGenerateHashContent      = "generate_hash_content"
+	jobDownloadArchive      = "download_archive"
+	jobExtract              = "extract_zip"
+	jobUploadArchive        = "upload_archive"
+	jobPeriodicArchiveCheck = "periodic_archive_check"
+	jobAnalyzePosts         = "analyze_posts"
+	jobAnalyzeReactions     = "analyze_reactions"
+	jobAnalyzeSentiments    = "analyze_sentiments"
+	jobNotificationFinish   = "notification_finish_parsing"
+	jobExtractTimeMetadata  = "extract_time_metadata"
+	jobGenerateHashContent  = "generate_hash_content"
 )
 
 type BackgroundContext struct {
@@ -204,10 +203,10 @@ func main() {
 
 	// Map the name of jobs to handler functions
 	pool.JobWithOptions(jobDownloadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
+		work.JobOptions{Priority: 10, MaxFails: 1},
 		b.downloadArchive)
 	pool.JobWithOptions(jobUploadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
+		work.JobOptions{Priority: 10, MaxFails: 1},
 		b.submitArchive)
 	pool.JobWithOptions(jobExtract,
 		work.JobOptions{Priority: 10, MaxFails: 1},
@@ -227,40 +226,36 @@ func main() {
 	pool.JobWithOptions(jobNotificationFinish,
 		work.JobOptions{Priority: 10, MaxFails: 1},
 		b.notifyAnalyzingDone)
-	pool.JobWithOptions(jobRecurringlySubmitArchive,
-		work.JobOptions{Priority: 1, MaxFails: 1},
-		b.recurringSubmitFBArchive)
 	pool.JobWithOptions(jobExtractTimeMetadata,
 		work.JobOptions{Priority: 1, MaxFails: 1},
 		b.extractTimeMetadata)
 	pool.JobWithOptions(jobGenerateHashContent,
-		work.JobOptions{Priority: 10, MaxFails: 1, MaxConcurrency: 1},
+		work.JobOptions{Priority: 10, MaxFails: 1},
 		b.generateHashContent)
 
-	// Start processing jobs
-	pool.Start()
-
-	// Enqueue recurringly checking job
-	enqueuer.EnqueueUnique(jobRecurringlySubmitArchive, work.Q{})
-
-	// Wait for a signal to quit:
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
-
-	// Create a new mux server
-	server := http.NewServeMux()
-	server.Handle("/metrics", promhttp.Handler())
 
 	go func(signalChan chan os.Signal) {
 		<-signalChan
 		log.Info("Preparing to shutdown")
 
+		httpClient.CloseIdleConnections()
 		// Stop the pool
 		pool.Stop()
 		sentry.Flush(time.Second * 5)
 
 		os.Exit(1)
 	}(signalChan)
+
+	// Start processing jobs
+	pool.Start()
+
+	// Wait for a signal to quit:
+
+	// Create a new mux server
+	server := http.NewServeMux()
+	server.Handle("/metrics", promhttp.Handler())
 
 	http.ListenAndServe(viper.GetString("worker_serveraddr"), server)
 }

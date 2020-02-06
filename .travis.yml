@@ -20,7 +20,7 @@ matrix:
         - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
       services:
         - docker
-      if: branch = master
+      if: branch = master AND fork = false
       before_script:
         - echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$DOCKER_USERNAME" --password-stdin  # Login to GitHub Registry using Travis environment variables
       script:

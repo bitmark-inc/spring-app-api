@@ -30,7 +30,7 @@ matrix:
       after_success:
         - docker push $REGISTRY/api:$VERSION
         - docker push $REGISTRY/background:$VERSION
-    - language: minimal  # Build on tag
+    - language: generic  # Build on tag
       env:
         - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
       services:
@@ -49,7 +49,8 @@ matrix:
         - docker push $API_DOCKER_IMG
         - docker push $BACKGROUND_DOCKER_IMG
       before_deploy:
-        - sudo apt-get install jshon
+        - sudo apt-get update
+        - travis_retry sudo apt-get install -y jshon
         - echo $RELEASE_BODY
         - export BODY=$(jshon -s "$RELEASE_BODY")
       deploy:

@@ -48,7 +48,10 @@ matrix:
       after_success:
         - docker push $API_DOCKER_IMG
         - docker push $BACKGROUND_DOCKER_IMG
+      before_deploy:
+        - brew install jshon
         - echo $RELEASE_BODY
+        - export BODY=$(jshon -s "$RELEASE_BODY"))
       deploy:
         provider: releases
         api_key: $GITHUB_TOKEN
@@ -59,6 +62,6 @@ matrix:
         draft: false
         prerelease: true
         name: $RELEASE_NAME
-        body: $RELEASE_BODY
+        body: $BODY
         on:
           tags: true

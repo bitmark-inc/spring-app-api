@@ -1,31 +1,52 @@
-language: go
-
-go:
-  - 1.13.x
-  - master
-
-sudo: true
-
-# Derived from https://github.com/lib/pq/blob/master/.travis.yml
-before_install:
-  - ./travis/before_install.bash
-
-env:
-  global:
-    - GO111MODULE=on
-    # Global app config:
-    - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
-
-  matrix:
-    - PGVERSION=12
-    - PGVERSION=11
-    - PGVERSION=10
-
-before_script:
-  - ./travis/before_script.bash
-
-script:
-  - ./travis/script.bash
-
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+matrix:
+  include:
+    - language: go # Build and Test
+      go:
+        - 1.13.x
+        - master
+      sudo: true
+      # Derived from https://github.com/lib/pq/blob/master/.travis.yml
+      before_install:
+        - ./travis/before_install.bash
+      env:
+        global:
+          - GO111MODULE=on
+          # Global app config:
+          - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
+        matrix:
+          - PGVERSION=12
+          - PGVERSION=11
+      before_script:
+        - ./travis/before_script.bash
+      script:
+        - ./travis/script.bash
+      after_success:
+        - bash <(curl -s https://codecov.io/bash)
+    - language: go  # Build on master
+      global:
+        - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
+      services:
+        - docker
+      if: branch = master
+      before_script:
+        - echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$DOCKER_USERNAME" --password-stdin  # Login to GitHub Registry using Travis environment variables
+      script:
+        - docker build --build-arg dist=$TRAVIS_COMMIT -t $REGISTRY/api:git-$TRAVIS_COMMIT . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$TRAVIS_COMMIT -t $REGISTRY/background:git-$TRAVIS_COMMIT -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
+      after_success:
+        - docker push $REGISTRY/api:git-$TRAVIS_COMMIT
+        - docker push $REGISTRY/background:git-$TRAVIS_COMMIT
+    - language: go  # Build on tag
+      global:
+        - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
+      services:
+        - docker
+      if: tag IS present
+      before_script:
+        - echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$DOCKER_USERNAME" --password-stdin  # Login to GitHub Registry using Travis environment variables
+      script:
+        - docker build --build-arg dist=$TRAVIS_TAG -t $REGISTRY/api:$TRAVIS_TAG . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$TRAVIS_TAG -t $REGISTRY/background:$TRAVIS_TAG -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
+      after_success:
+        - docker push $REGISTRY/api:git-$TRAVIS_TAG
+        - docker push $REGISTRY/background:git-$TRAVIS_TAG

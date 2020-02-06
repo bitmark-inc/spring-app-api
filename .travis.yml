@@ -3,26 +3,21 @@ matrix:
     - language: go # Build and Test
       go:
         - 1.13.x
-        - master
       sudo: true
       # Derived from https://github.com/lib/pq/blob/master/.travis.yml
-      before_install:
-        - ./travis/before_install.bash
       env:
         global:
           - GO111MODULE=on
           # Global app config:
           - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
-        matrix:
           - PGVERSION=12
-          - PGVERSION=11
-      before_script:
-        - ./travis/before_script.bash
       script:
+        - ./travis/before_install.bash
+        - ./travis/before_script.bash
         - ./travis/script.bash
       after_success:
         - bash <(curl -s https://codecov.io/bash)
-    - language: go  # Build on master
+    - language: minimal  # Build on master
       env:
         global:
           - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
@@ -37,7 +32,7 @@ matrix:
       after_success:
         - docker push $REGISTRY/api:git-$TRAVIS_COMMIT
         - docker push $REGISTRY/background:git-$TRAVIS_COMMIT
-    - language: go  # Build on tag
+    - language: minimal  # Build on tag
       env:
         global:
           - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api

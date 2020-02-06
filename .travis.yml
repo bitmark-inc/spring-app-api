@@ -39,9 +39,23 @@ matrix:
       if: tag IS present
       before_script:
         - echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$DOCKER_USERNAME" --password-stdin  # Login to GitHub Registry using Travis environment variables
+        - export API_DOCKER_IMG=$REGISTRY/api:$TRAVIS_TAG
+        - export BACKGROUND_DOCKER_IMG=$REGISTRY/background:$TRAVIS_TAG
+        - export RELEASE_BODY=`cat ./travis/release_template.md | sed -e 's@SPRING_VERSION@'"$TRAVIS_TAG"'@g;s@API_DOCKER_IMG@'"$API_DOCKER_IMG"'@g;s@BACKGROUND_DOCKER_IMG@'"$BACKGROUND_DOCKER_IMG"'@g'`
       script:
-        - docker build --build-arg dist=$TRAVIS_TAG -t $REGISTRY/api:$TRAVIS_TAG . || { echo 'build failed' ; exit 1; }
-        - docker build --build-arg dist=$TRAVIS_TAG -t $REGISTRY/background:$TRAVIS_TAG -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$TRAVIS_TAG -t $API_DOCKER_IMG . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$TRAVIS_TAG -t $BACKGROUND_DOCKER_IMG -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
       after_success:
-        - docker push $REGISTRY/api:git-$TRAVIS_TAG
-        - docker push $REGISTRY/background:git-$TRAVIS_TAG
+        - docker push $API_DOCKER_IMG
+        - docker push $BACKGROUND_DOCKER_IMG
+      deploy:
+        provider: releases
+        api_key: $GITHUB_TOKEN
+        overwrite: true
+        skip_cleanup: true
+        target_commitish: $TRAVIS_COMMIT
+        tag_name: $TRAVIS_TAG
+        draft: false
+        prerelease: true
+        on:
+          tags: true

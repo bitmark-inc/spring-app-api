@@ -49,9 +49,9 @@ matrix:
         - docker push $API_DOCKER_IMG
         - docker push $BACKGROUND_DOCKER_IMG
       before_deploy:
-        - brew install jshon
+        - sudo apt-get install jshon
         - echo $RELEASE_BODY
-        - export BODY=$(jshon -s "$RELEASE_BODY"))
+        - export BODY=$(jshon -s "$RELEASE_BODY")
       deploy:
         provider: releases
         api_key: $GITHUB_TOKEN

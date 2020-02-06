@@ -6,11 +6,9 @@ matrix:
       sudo: true
       # Derived from https://github.com/lib/pq/blob/master/.travis.yml
       env:
-        global:
-          - GO111MODULE=on
-          # Global app config:
-          - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
-          - PGVERSION=12
+        - GO111MODULE=on
+        - FBM_DB_CONN=postgres://fbm:secret@127.0.0.1/fbm
+        - PGVERSION=12
       script:
         - ./travis/before_install.bash
         - ./travis/before_script.bash
@@ -19,8 +17,7 @@ matrix:
         - bash <(curl -s https://codecov.io/bash)
     - language: minimal  # Build on master
       env:
-        global:
-          - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
+        - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
       services:
         - docker
       if: branch = master

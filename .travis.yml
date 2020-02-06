@@ -32,8 +32,7 @@ matrix:
         - docker push $REGISTRY/background:$VERSION
     - language: minimal  # Build on tag
       env:
-        global:
-          - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
+        - REGISTRY=docker.pkg.github.com/bitmark-inc/spring-app-api
       services:
         - docker
       if: tag IS present

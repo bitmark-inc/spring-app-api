@@ -22,14 +22,14 @@ matrix:
         - docker
       if: branch = master AND fork = false
       before_script:
-        - export VERSION="release-$(git rev-parse --short ${TRAVIS_COMMIT})"
+        - export VERSION="commit-$(git rev-parse --short ${TRAVIS_COMMIT})"
         - echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$DOCKER_USERNAME" --password-stdin  # Login to GitHub Registry using Travis environment variables
       script:
-        - docker build --build-arg dist=$VERSION -t $REGISTRY/api:git-$VERSION . || { echo 'build failed' ; exit 1; }
-        - docker build --build-arg dist=$VERSION -t $REGISTRY/background:git-$VERSION -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$VERSION -t $REGISTRY/api:$VERSION . || { echo 'build failed' ; exit 1; }
+        - docker build --build-arg dist=$VERSION -t $REGISTRY/background:$VERSION -f Dockerfile-Jobs . || { echo 'build failed' ; exit 1; }
       after_success:
-        - docker push $REGISTRY/api:git-$VERSION
-        - docker push $REGISTRY/background:git-$VERSION
+        - docker push $REGISTRY/api:$VERSION
+        - docker push $REGISTRY/background:$VERSION
     - language: minimal  # Build on tag
       env:
         global:

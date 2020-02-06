@@ -1,3 +1,4 @@
-# SPRING SERVER version SPRING_VERSION
-- API server: API_DOCKER_IMG
-- Background: BACKGROUND_DOCKER_IMG
+# SPRING SERVER v SPRING_VERSION
+- API server: https://github.com/bitmark-inc/spring-app-api/packages/121902?version=SPRING_VERSION
+- Background: https://github.com/bitmark-inc/spring-app-api/packages/121904?version=SPRING_VERSION
+

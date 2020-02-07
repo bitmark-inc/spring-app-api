@@ -10,6 +10,7 @@ import (
 	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/bitmark-inc/spring-app-api/store"
+	"github.com/bitmark-inc/spring-app-api/timeutil"
 	"github.com/getsentry/sentry-go"
 	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"
@@ -145,7 +146,7 @@ func (r *reactionStatCounter) createEmptyStat(period string, timestamp int64) *r
 		Reaction: &protomodel.Usage{
 			SectionName:     "reaction",
 			Period:          period,
-			PeriodStartedAt: absPeriod(period, timestamp),
+			PeriodStartedAt: timeutil.AbsPeriod(period, timestamp),
 			Groups: &protomodel.Group{
 				Type: &protomodel.PeriodData{
 					Data: make(map[string]int64),
@@ -164,7 +165,7 @@ func (r *reactionStatCounter) flushStat(period string, currentStat *reactionStat
 		if lastStat != nil {
 			lastQuantity = lastStat.Reaction.Quantity
 		}
-		currentStat.Reaction.DiffFromPrevious = getDiff(float64(currentStat.Reaction.Quantity), float64(lastQuantity))
+		currentStat.Reaction.DiffFromPrevious = timeutil.GetDiff(float64(currentStat.Reaction.Quantity), float64(lastQuantity))
 
 		statData, _ := proto.Marshal(currentStat.Reaction)
 
@@ -204,7 +205,7 @@ func (r *reactionStatCounter) count(reaction fbarchive.ReactionData) error {
 }
 
 func (r *reactionStatCounter) countWeek(reaction fbarchive.ReactionData) error {
-	periodTimestamp := absWeek(reaction.Timestamp)
+	periodTimestamp := timeutil.AbsWeek(reaction.Timestamp)
 
 	// Release the current period if next period has come
 	if r.currentWeekStat != nil && r.currentWeekStat.Reaction.PeriodStartedAt != periodTimestamp {
@@ -224,7 +225,7 @@ func (r *reactionStatCounter) countWeek(reaction fbarchive.ReactionData) error {
 	plusOneValue(&r.currentWeekStat.Reaction.Groups.Type.Data, reaction.Reaction)
 
 	subPeriod := r.currentWeekStat.Reaction.Groups.SubPeriod
-	subPeriodTimestamp := absDay(reaction.Timestamp)
+	subPeriodTimestamp := timeutil.AbsDay(reaction.Timestamp)
 	needNewSubPeriod := len(subPeriod) == 0 || subPeriod[len(subPeriod)-1].Name != strconv.FormatInt(subPeriodTimestamp, 10)
 
 	if needNewSubPeriod {
@@ -240,7 +241,7 @@ func (r *reactionStatCounter) countWeek(reaction fbarchive.ReactionData) error {
 }
 
 func (r *reactionStatCounter) countYear(reaction fbarchive.ReactionData) error {
-	periodTimestamp := absYear(reaction.Timestamp)
+	periodTimestamp := timeutil.AbsYear(reaction.Timestamp)
 
 	// Release the current period if next period has come
 	if r.currentYearStat != nil && r.currentYearStat.Reaction.PeriodStartedAt != periodTimestamp {
@@ -260,7 +261,7 @@ func (r *reactionStatCounter) countYear(reaction fbarchive.ReactionData) error {
 	plusOneValue(&r.currentYearStat.Reaction.Groups.Type.Data, reaction.Reaction)
 
 	subPeriod := r.currentYearStat.Reaction.Groups.SubPeriod
-	subPeriodTimestamp := absMonth(reaction.Timestamp)
+	subPeriodTimestamp := timeutil.AbsMonth(reaction.Timestamp)
 	needNewSubPeriod := len(subPeriod) == 0 || subPeriod[len(subPeriod)-1].Name != strconv.FormatInt(subPeriodTimestamp, 10)
 
 	if needNewSubPeriod {
@@ -276,7 +277,7 @@ func (r *reactionStatCounter) countYear(reaction fbarchive.ReactionData) error {
 }
 
 func (r *reactionStatCounter) countDecade(reaction fbarchive.ReactionData) error {
-	periodTimestamp := absDecade(reaction.Timestamp)
+	periodTimestamp := timeutil.AbsDecade(reaction.Timestamp)
 
 	// Release the current period if next period has come
 	if r.currentDecadeStat != nil && r.currentDecadeStat.Reaction.PeriodStartedAt != periodTimestamp {
@@ -297,7 +298,7 @@ func (r *reactionStatCounter) countDecade(reaction fbarchive.ReactionData) error
 	plusOneValue(&r.currentDecadeStat.Reaction.Groups.Type.Data, reaction.Reaction)
 
 	subPeriod := r.currentDecadeStat.Reaction.Groups.SubPeriod
-	subPeriodTimestamp := absYear(reaction.Timestamp)
+	subPeriodTimestamp := timeutil.AbsYear(reaction.Timestamp)
 	needNewSubPeriod := len(subPeriod) == 0 || subPeriod[len(subPeriod)-1].Name != strconv.FormatInt(subPeriodTimestamp, 10)
 
 	if needNewSubPeriod {

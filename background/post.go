@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/timeutil"
 )
 
 func (b *BackgroundContext) extractPost(job *work.Job) (err error) {
@@ -341,8 +342,8 @@ func (sc *postStatisticCounter) flushWeekData() {
 
 	// Calculate the difference if last week has data
 	difference := 1.0
-	if sc.lastWeek == absWeek(sc.currentWeek-1) {
-		difference = getDiff(float64(currentTotal), float64(sc.lastTotalPostOfWeek))
+	if sc.lastWeek == timeutil.AbsWeek(sc.currentWeek-1) {
+		difference = timeutil.GetDiff(float64(currentTotal), float64(sc.lastTotalPostOfWeek))
 	}
 	sc.lastTotalPostOfWeek = currentTotal
 
@@ -377,7 +378,7 @@ func (sc *postStatisticCounter) countWeek(r *protomodel.Post) {
 		return
 	}
 
-	week := absWeek(r.Timestamp)
+	week := timeutil.AbsWeek(r.Timestamp)
 	if sc.currentWeek == 0 {
 		sc.lastWeek = 0
 		sc.currentWeek = week
@@ -394,7 +395,7 @@ func (sc *postStatisticCounter) countWeek(r *protomodel.Post) {
 
 	// parse sub periods of days, friends, places in a week
 	plusOneValue(&sc.currentWeekTypeMap, r.Type)
-	weekTypeMap := getMap(sc.WeekTypePeriodsMap, strconv.FormatInt(absDay(r.Timestamp), 10))
+	weekTypeMap := getMap(sc.WeekTypePeriodsMap, strconv.FormatInt(timeutil.AbsDay(r.Timestamp), 10))
 	plusOneValue(weekTypeMap, r.Type)
 
 	if r.Location != nil {
@@ -444,8 +445,8 @@ func (sc *postStatisticCounter) flushYearData() {
 
 	// Calculate the difference if last week has data
 	difference := 1.0
-	if sc.lastYear == absYear(sc.currentYear-1) {
-		difference = getDiff(float64(currentTotal), float64(sc.lastTotalPostOfYear))
+	if sc.lastYear == timeutil.AbsYear(sc.currentYear-1) {
+		difference = timeutil.GetDiff(float64(currentTotal), float64(sc.lastTotalPostOfYear))
 	}
 	sc.lastTotalPostOfYear = currentTotal
 
@@ -480,7 +481,7 @@ func (sc *postStatisticCounter) countYear(r *protomodel.Post) {
 		return
 	}
 
-	year := absYear(r.Timestamp)
+	year := timeutil.AbsYear(r.Timestamp)
 	if sc.currentYear == 0 {
 		sc.lastYear = 0
 		sc.currentYear = year
@@ -497,7 +498,7 @@ func (sc *postStatisticCounter) countYear(r *protomodel.Post) {
 
 	// parse sub periods of days, friends, places in a year
 	plusOneValue(&sc.currentYearTypeMap, r.Type)
-	yearTypeMap := getMap(sc.YearTypePeriodsMap, strconv.FormatInt(absMonth(r.Timestamp), 10))
+	yearTypeMap := getMap(sc.YearTypePeriodsMap, strconv.FormatInt(timeutil.AbsMonth(r.Timestamp), 10))
 	plusOneValue(yearTypeMap, r.Type)
 
 	if r.Location != nil {
@@ -547,8 +548,8 @@ func (sc *postStatisticCounter) flushDecadeData() {
 
 	// Calculate the difference if last week has data
 	difference := 1.0
-	if sc.lastDecade == absDecade(sc.currentDecade-1) {
-		difference = getDiff(float64(currentTotal), float64(sc.lastTotalPostOfDecade))
+	if sc.lastDecade == timeutil.AbsDecade(sc.currentDecade-1) {
+		difference = timeutil.GetDiff(float64(currentTotal), float64(sc.lastTotalPostOfDecade))
 	}
 	sc.lastTotalPostOfDecade = currentTotal
 
@@ -583,7 +584,7 @@ func (sc *postStatisticCounter) countDecade(r *protomodel.Post) {
 		return
 	}
 
-	decade := absDecade(r.Timestamp)
+	decade := timeutil.AbsDecade(r.Timestamp)
 	if sc.currentDecade == 0 {
 		sc.lastDecade = 0
 		sc.currentDecade = decade
@@ -600,7 +601,7 @@ func (sc *postStatisticCounter) countDecade(r *protomodel.Post) {
 
 	// parse sub periods of days, friends, places in a decade
 	plusOneValue(&sc.currentDecadeTypeMap, r.Type)
-	decadeTypeMap := getMap(sc.DecadeTypePeriodsMap, strconv.FormatInt(absYear(r.Timestamp), 10))
+	decadeTypeMap := getMap(sc.DecadeTypePeriodsMap, strconv.FormatInt(timeutil.AbsYear(r.Timestamp), 10))
 	plusOneValue(decadeTypeMap, r.Type)
 
 	if r.Location != nil {

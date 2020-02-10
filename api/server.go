@@ -193,6 +193,14 @@ func (s *Server) setupRouter() *gin.Engine {
 		usageRoute.GET("/:period", s.getPostStats)
 	}
 
+	statsRoute := apiRoute.Group("/stats")
+	statsRoute.Use(s.authMiddleware())
+	statsRoute.Use(s.recognizeAccountMiddleware())
+	{
+		statsRoute.GET("/posts", s.postsCountStats)
+		statsRoute.GET("/reactions", s.reactionsCountStats)
+	}
+
 	insightRoute := apiRoute.Group("/insight")
 	insightRoute.Use(s.authMiddleware())
 	insightRoute.Use(s.fakeCredential())

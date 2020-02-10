@@ -7,6 +7,7 @@ import (
 
 	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/timeutil"
 	"github.com/getsentry/sentry-go"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -68,8 +69,8 @@ func (b *BackgroundContext) extractSentiment(ctx context.Context, accountNumber 
 		return err
 	}
 
-	timestampOffset := absWeek(firstPost.Timestamp)
-	nextWeek := absWeek(lastPost.Timestamp) + 7*24*60*60
+	timestampOffset := timeutil.AbsWeek(firstPost.Timestamp)
+	nextWeek := timeutil.AbsWeek(lastPost.Timestamp) + 7*24*60*60
 	toEndOfWeek := int64(7*24*60*60 - 1)
 
 	for {
@@ -167,7 +168,7 @@ func (s *sentimentStatCounter) flushStat(period string, currentStat *sentimentSt
 		if lastStat != nil {
 			lastSentiment = lastStat.Usage.Value
 		}
-		currentStat.Usage.DiffFromPrevious = getDiff(currentStat.Usage.Value, lastSentiment)
+		currentStat.Usage.DiffFromPrevious = timeutil.GetDiff(currentStat.Usage.Value, lastSentiment)
 
 		statData, _ := proto.Marshal(currentStat.Usage)
 		if err := s.saver.save(s.accountNumber+"/sentiment-"+period+"-stat", currentStat.Usage.PeriodStartedAt, statData); err != nil {
@@ -192,7 +193,7 @@ func (s *sentimentStatCounter) createEmptyStat(period string, timestamp int64) *
 		Usage: &protomodel.Usage{
 			SectionName:     "sentiment",
 			Period:          period,
-			PeriodStartedAt: absPeriod(period, timestamp),
+			PeriodStartedAt: timeutil.AbsPeriod(period, timestamp),
 		},
 		IsSaved:         false,
 		SubPeriodValues: make([]float64, 0),
@@ -200,7 +201,7 @@ func (s *sentimentStatCounter) createEmptyStat(period string, timestamp int64) *
 }
 
 func (s *sentimentStatCounter) countWeek(timestamp int64, sentimentValue float64) error {
-	periodTimestamp := absWeek(timestamp)
+	periodTimestamp := timeutil.AbsWeek(timestamp)
 
 	// flush the current period to give space for next period
 	if s.currentWeekStat != nil && s.currentWeekStat.Usage.PeriodStartedAt != periodTimestamp {
@@ -221,7 +222,7 @@ func (s *sentimentStatCounter) countWeek(timestamp int64, sentimentValue float64
 }
 
 func (s *sentimentStatCounter) countYear(timestamp int64, sentimentValue float64) error {
-	periodTimestamp := absYear(timestamp)
+	periodTimestamp := timeutil.AbsYear(timestamp)
 
 	// flush the current period to give space for next period
 	if s.currentYearStat != nil && s.currentYearStat.Usage.PeriodStartedAt != periodTimestamp {
@@ -242,7 +243,7 @@ func (s *sentimentStatCounter) countYear(timestamp int64, sentimentValue float64
 }
 
 func (s *sentimentStatCounter) countDecade(timestamp int64, sentimentValue float64) error {
-	periodTimestamp := absDecade(timestamp)
+	periodTimestamp := timeutil.AbsDecade(timestamp)
 
 	// New decade, let's save current decade before continuing to aggregate
 	if s.currentDecadeStat != nil && s.currentDecadeStat.Usage.PeriodStartedAt != periodTimestamp {

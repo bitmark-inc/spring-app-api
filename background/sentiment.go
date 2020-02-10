@@ -5,40 +5,38 @@ import (
 	"errors"
 	"math"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/bitmark-inc/spring-app-api/timeutil"
 	"github.com/getsentry/sentry-go"
-	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 )
 
-func (b *BackgroundContext) extractSentiment(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-
-	logEntry := log.WithField("prefix", job.Name+"/"+job.ID)
-
-	accountNumber := job.ArgString("account_number")
-	archiveid := job.ArgInt64("archive_id")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
+func (b *BackgroundContext) extractSentiment(ctx context.Context, accountNumber string, archiveid int64) (err error) {
+	logEntry := log.WithField("prefix", "extract_sentiment")
 
 	defer func() error {
 		if err == nil {
 			logEntry.Info("Finish parsing sentiments")
 
-			if _, err := enqueuer.EnqueueUnique(jobAnalyzeReactions, work.Q{
-				"account_number": accountNumber,
-				"archive_id":     archiveid,
-			}); err != nil {
-				return err
-			}
+			server.SendTask(&tasks.Signature{
+				Name: jobAnalyzeReactions,
+				Args: []tasks.Arg{
+					{
+						Type:  "string",
+						Value: accountNumber,
+					},
+					{
+						Type:  "int64",
+						Value: archiveid,
+					},
+				},
+			})
 		}
 		return err
 	}()
 
-	ctx := context.Background()
 	saver := newStatSaver(b.fbDataStore)
 	counter := newSentimentStatCounter(ctx, logEntry, saver, accountNumber)
 

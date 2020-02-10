@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/bitmark-inc/spring-app-api/store"
-	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
@@ -121,15 +121,21 @@ func (s *Server) accountUpdateMetadata(c *gin.Context) {
 func (s *Server) accountDelete(c *gin.Context) {
 	account := c.MustGet("account").(*store.Account)
 
-	job, err := s.backgroundEnqueuer.EnqueueUnique("delete_user_data", work.Q{
-		"account_number": account.AccountNumber,
+	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+		Name: "delete_user_data",
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: account.AccountNumber,
+			},
+		},
 	})
 	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 		return
 	}
-	log.Info("Enqueued job with id:", job.ID)
+	log.Info("Enqueued job with id:", job.Signature.UUID)
 
 	// Return success
 	c.JSON(http.StatusOK, gin.H{"result": "OK"})
@@ -148,16 +154,22 @@ func (s *Server) adminAccountDelete(c *gin.Context) {
 
 	result := make(map[string]string)
 	for _, accountNumber := range params.AccountNumbers {
-		job, err := s.backgroundEnqueuer.EnqueueUnique("delete_user_data", work.Q{
-			"account_number": accountNumber,
+		job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+			Name: "delete_user_data",
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: accountNumber,
+				},
+			},
 		})
 		if err != nil {
 			log.Debug(err)
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
-		log.Info("Enqueued job with id:", job.ID)
-		result[job.ID] = accountNumber
+		log.Info("Enqueued job with id:", job.Signature.UUID)
+		result[job.Signature.UUID] = accountNumber
 	}
 
 	// Return success

@@ -3,19 +3,11 @@ package main
 import (
 	"context"
 
-	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 )
 
-func (b *BackgroundContext) notifyAnalyzingDone(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-	accountNumber := job.ArgString("account_number")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
-
-	ctx := context.Background()
+func (b *BackgroundContext) notifyAnalyzingDone(ctx context.Context, accountNumber string) error {
+	logEntity := log.WithField("prefix", "notify_analyzing_done")
 
 	if err := b.oneSignalClient.NotifyFBArchiveAvailable(ctx, accountNumber); err != nil {
 		logEntity.Error(err)

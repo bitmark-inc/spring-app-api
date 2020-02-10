@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -22,19 +23,25 @@ import (
 	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/getsentry/sentry-go"
-	"github.com/gocraft/work"
-	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/RichardKnop/machinery/v1"
+	backendsiface "github.com/RichardKnop/machinery/v1/backends/iface"
+	brokersiface "github.com/RichardKnop/machinery/v1/brokers/iface"
+	machinerycnf "github.com/RichardKnop/machinery/v1/config"
+	"github.com/RichardKnop/machinery/v1/tasks"
 )
 
 var (
-	enqueuer *work.Enqueuer
-	pool     *work.WorkerPool
-	g        errgroup.Group
+	server  *machinery.Server
+	broker  brokersiface.Broker
+	backend backendsiface.Backend
+
+	g errgroup.Group
 )
 
 const (
@@ -188,105 +195,106 @@ func main() {
 	}
 	maxProcessingGaugeVec.WithLabelValues().Set(float64(viper.GetUint("worker.concurrency")))
 
-	redisPool := &redis.Pool{
-		MaxActive: 5,
-		MaxIdle:   5,
-		Wait:      true,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", viper.GetString("redis.conn"), redis.DialPassword(viper.GetString("redis.password")))
-		},
+	var cnf = &machinerycnf.Config{
+		Broker:        viper.GetString("redis.conn"),
+		DefaultQueue:  "fbm_background",
+		ResultBackend: viper.GetString("redis.conn"),
+		NoUnixSignals: false,
+	}
+	s, err := machinery.NewServer(cnf)
+	if err != nil {
+		log.Panic(err)
+	}
+	server = s
+
+	server.RegisterTask(jobDownloadArchive, b.downloadArchive)
+	server.RegisterTask(jobUploadArchive, b.submitArchive)
+	server.RegisterTask(jobPeriodicArchiveCheck, b.checkArchive)
+	server.RegisterTask(jobAnalyzePosts, b.extractPost)
+	server.RegisterTask(jobAnalyzeReactions, b.extractReaction)
+	server.RegisterTask(jobAnalyzeSentiments, b.extractSentiment)
+	server.RegisterTask(jobNotificationFinish, b.notifyAnalyzingDone)
+	server.RegisterTask(jobExtractTimeMetadata, b.extractTimeMetadata)
+	server.RegisterTask(jobGenerateHashContent, b.generateHashContent)
+	server.RegisterTask(jobDeleteUserData, b.deleteUserData)
+
+	workerName, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+	worker := server.NewWorker(workerName, viper.GetInt("worker.concurrency"))
+	if err := worker.Launch(); err != nil {
+		log.Fatal(err)
 	}
 
-	pool = work.NewWorkerPool(*b, viper.GetUint("worker.concurrency"), "fbm", redisPool)
-	enqueuer = work.NewEnqueuer("fbm", redisPool)
-
-	// Add middleware for logging for each job
-	pool.Middleware(b.log)
-	pool.Middleware(b.jobStartCollectiveMetric)
-
 	// Map the name of jobs to handler functions
-	pool.JobWithOptions(jobDownloadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.downloadArchive)
-	pool.JobWithOptions(jobUploadArchive,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.submitArchive)
-	pool.JobWithOptions(jobExtract,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.extractMedia)
-	pool.JobWithOptions(jobPeriodicArchiveCheck,
-		work.JobOptions{Priority: 5, MaxFails: 1},
-		b.checkArchive)
-	pool.JobWithOptions(jobAnalyzePosts,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.extractPost)
-	pool.JobWithOptions(jobAnalyzeReactions,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.extractReaction)
-	pool.JobWithOptions(jobAnalyzeSentiments,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.extractSentiment)
-	pool.JobWithOptions(jobNotificationFinish,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.notifyAnalyzingDone)
-	pool.JobWithOptions(jobExtractTimeMetadata,
-		work.JobOptions{Priority: 1, MaxFails: 1},
-		b.extractTimeMetadata)
-	pool.JobWithOptions(jobGenerateHashContent,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.generateHashContent)
-	pool.JobWithOptions(jobDeleteUserData,
-		work.JobOptions{Priority: 10, MaxFails: 1},
-		b.deleteUserData)
-
-	signalChan := make(chan os.Signal, 2)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
-
-	go func(signalChan chan os.Signal) {
-		<-signalChan
-		log.Info("Preparing to shutdown")
-
-		httpClient.CloseIdleConnections()
-		// Stop the pool
-		pool.Stop()
-		sentry.Flush(time.Second * 5)
-
-		os.Exit(1)
-	}(signalChan)
+	worker.SetPreTaskHandler(b.jobStartCollectiveMetric)
+	worker.SetPostTaskHandler(b.jobEndCollectiveMetric)
+	worker.SetErrorHandler(b.jobErrorHandler)
 
 	// Start processing jobs
-	pool.Start()
 
 	// Wait for a signal to quit:
 
 	// Create a new mux server
-	server := http.NewServeMux()
-	server.Handle("/metrics", promhttp.Handler())
+	serverMux := http.NewServeMux()
+	serverMux.Handle("/metrics", promhttp.Handler())
+	httpServer := http.Server{
+		Addr:    viper.GetString("worker_serveraddr"),
+		Handler: serverMux,
+	}
 
-	http.ListenAndServe(viper.GetString("worker_serveraddr"), server)
-}
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Info("Preparing to shutdown")
+		ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFunc()
 
-func (b *BackgroundContext) log(job *work.Job, next work.NextMiddlewareFunc) error {
-	log.WithField("args", job.Args).Info("Starting job: ", job.Name)
-	return next()
+		log.Info("close idle connections")
+		httpClient.CloseIdleConnections()
+
+		log.Info("close postgres connection")
+		pgstore.Close(ctx)
+
+		log.Info("shutdown metric server")
+		httpServer.Shutdown(ctx)
+
+		log.Info("quit woker")
+		worker.Quit()
+
+		log.Info("flush sentry")
+		sentry.Flush(time.Second * 5)
+
+		os.Exit(1)
+	}()
+
+	g.Go(func() error {
+		if err := worker.Launch(); err != nil && err != errors.New("Worker quit gracefully") {
+			return err
+		}
+
+		return nil
+	})
+	g.Go(func() error {
+		return httpServer.ListenAndServe()
+	})
+
+	log.Panic(g.Wait())
 }
 
 // For metric
-func (b *BackgroundContext) jobStartCollectiveMetric(job *work.Job, next work.NextMiddlewareFunc) error {
-	currentProcessingGaugeVec.WithLabelValues(job.Name).Inc()
-	return next()
+func (b *BackgroundContext) jobStartCollectiveMetric(signature *tasks.Signature) {
+	currentProcessingGaugeVec.WithLabelValues(signature.Name).Inc()
 }
 
-func jobEndCollectiveMetric(err error, job *work.Job) error {
-	totalProcessedCounterVec.WithLabelValues(job.Name).Inc()
-	currentProcessingGaugeVec.WithLabelValues(job.Name).Dec()
-	if err != nil {
-		totalFailedCounterVec.WithLabelValues(job.Name).Inc()
-		logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-		logEntity.Error(err)
-		sentry.CaptureException(err)
-	} else {
-		totalSuccessfulCounterVec.WithLabelValues(job.Name).Inc()
-	}
-	return nil
+func (b *BackgroundContext) jobEndCollectiveMetric(signature *tasks.Signature) {
+	totalProcessedCounterVec.WithLabelValues(signature.Name).Inc()
+	currentProcessingGaugeVec.WithLabelValues(signature.Name).Dec()
+}
+
+func (b *BackgroundContext) jobErrorHandler(err error) {
+	log.Error(err)
+	sentry.CaptureException(err)
 }

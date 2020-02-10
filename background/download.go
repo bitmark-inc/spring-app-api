@@ -9,42 +9,25 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strconv"
-	"strings"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
-	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/sha3"
 )
 
-func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-	fileURL := job.ArgString("file_url")
-	rawCookie := job.ArgString("raw_cookie")
-	archiveid := job.ArgInt64("archive_id")
-	accountNumber := job.ArgString("account_number")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
+func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCookie, accountNumber string, archiveid int64) error {
+	logEntity := log.WithField("prefix", "download_archive")
 
-	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, "GET", fileURL, nil)
 	if err != nil {
 		logEntity.Error(err)
 		return err
-	}
-
-	headerPrefix := "header_"
-	for k, v := range job.Args {
-		if strings.HasPrefix(k, headerPrefix) {
-			req.Header.Set(k[len(headerPrefix):], v.(string))
-		}
 	}
 
 	req.Header.Set("Cookie", rawCookie)
@@ -61,8 +44,6 @@ func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
 		return err
 	}
 
-	job.Checkin("Start downloading archives")
-
 	// Print out the response in console log
 	dumpBytes, err := httputil.DumpResponse(resp, false)
 	if err != nil {
@@ -73,7 +54,6 @@ func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
 
 	if resp.StatusCode > 300 {
 		logEntity.Error("Request failed")
-		job.Checkin("Request failed")
 		sentry.CaptureException(errors.New("Request failed"))
 		return nil
 	}
@@ -84,7 +64,6 @@ func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
 	_, p, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
 	if err != nil {
 		logEntity.Error(err)
-		job.Checkin("Looks like it's a html page")
 		sentry.CaptureException(err)
 		return nil
 	}
@@ -96,7 +75,6 @@ func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
 	defer resp.Body.Close()
 
 	logEntity.Info("Start uploading to S3")
-	job.Checkin("Start uploading to S3")
 
 	s3key := "archives/" + accountNumber + "/" + filename
 	_, err = svc.Upload(&s3manager.UploadInput{
@@ -130,10 +108,22 @@ func (b *BackgroundContext) downloadArchive(job *work.Job) (err error) {
 		return err
 	}
 
-	enqueuer.EnqueueUniqueIn(jobUploadArchive, 1, map[string]interface{}{
-		"s3_key":         s3key,
-		"account_number": accountNumber,
-		"archive_id":     archiveid,
+	server.SendTask(&tasks.Signature{
+		Name: jobUploadArchive,
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: s3key,
+			},
+			{
+				Type:  "string",
+				Value: accountNumber,
+			},
+			{
+				Type:  "int64",
+				Value: archiveid,
+			},
+		},
 	})
 
 	logEntity.Info("Finish...")

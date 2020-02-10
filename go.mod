@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/Masterminds/squirrel v1.1.0
+	github.com/RichardKnop/machinery v1.7.3
 	github.com/aws/aws-sdk-go v1.25.36
 	github.com/bitmark-inc/bitmark-sdk-go v0.2.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -12,10 +13,8 @@ require (
 	github.com/gin-gonic/gin v1.5.0
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
-	github.com/gocraft/work v0.5.1
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.3
-	github.com/gomodule/redigo v1.7.1-0.20190724094224-574c33c3df38
 	github.com/jackc/pgx/v4 v4.3.0
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
@@ -23,7 +22,6 @@ require (
 	github.com/mattn/go-sqlite3 v2.0.1+incompatible // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/prometheus/client_golang v1.3.0
-	github.com/robfig/cron v1.2.0 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/viper v1.5.0

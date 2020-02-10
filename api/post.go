@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -139,4 +141,58 @@ func (s *Server) getPostMediaURI(c *gin.Context) {
 	log.Debug(uri)
 
 	c.Redirect(http.StatusSeeOther, uri)
+}
+
+func (s *Server) postsCountStats(c *gin.Context) {
+	var params struct {
+		From time.Time `form:"from" time_format:"unix"`
+		To   time.Time `form:"to" time_format:"unix"`
+	}
+
+	if err := c.BindQuery(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	if params.From.After(params.To) {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	account := c.MustGet("account").(*store.Account)
+
+	stats, err := s.bitSocialClient.GetPostsStats(c, params.From.Unix(), params.To.Unix(), account.AccountNumber)
+	if shouldInterupt(err, c) {
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": stats})
+}
+
+func (s *Server) reactionsCountStats(c *gin.Context) {
+	var params struct {
+		From time.Time `form:"from" time_format:"unix"`
+		To   time.Time `form:"to" time_format:"unix"`
+	}
+
+	if err := c.BindQuery(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	if params.From.After(params.To) {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	account := c.MustGet("account").(*store.Account)
+
+	stats, err := s.bitSocialClient.GetReactionsStats(c, params.From.Unix(), params.To.Unix(), account.AccountNumber)
+	if shouldInterupt(err, c) {
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": stats})
 }

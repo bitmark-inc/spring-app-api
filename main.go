@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/RichardKnop/machinery/v1"
+	machinerycnf "github.com/RichardKnop/machinery/v1/config"
 	"github.com/aws/aws-sdk-go/aws"
 	bitmarksdk "github.com/bitmark-inc/bitmark-sdk-go"
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
@@ -23,8 +25,6 @@ import (
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/getsentry/sentry-go"
-	"github.com/gocraft/work"
-	"github.com/gomodule/redigo/redis"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -181,16 +181,15 @@ func main() {
 	log.WithField("prefix", "init").Info("Initilized db store")
 
 	// Init redis
-	redisPool := &redis.Pool{
-		MaxActive: 5,
-		MaxIdle:   5,
-		Wait:      true,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", viper.GetString("redis.conn"), redis.DialPassword(viper.GetString("redis.password")))
-		},
+	var cnf = &machinerycnf.Config{
+		Broker:        viper.GetString("redis.conn"),
+		DefaultQueue:  "fbm_background",
+		ResultBackend: viper.GetString("redis.conn"),
 	}
-
-	var enqueuer = work.NewEnqueuer("fbm", redisPool)
+	machineryServer, err := machinery.NewServer(cnf)
+	if err != nil {
+		log.Panic(err)
+	}
 
 	dynamodbStore, err := dynamodb.NewDynamoDBStore(awsConf, viper.GetString("aws.dynamodb.table"))
 	if err != nil {
@@ -203,7 +202,7 @@ func main() {
 		jwtPrivateKey,
 		awsConf,
 		globalAccount,
-		enqueuer)
+		machineryServer)
 	log.WithField("prefix", "init").Info("Initilized http server")
 
 	// Remove initial context

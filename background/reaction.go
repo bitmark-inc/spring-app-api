@@ -3,39 +3,31 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
-	"github.com/gocraft/work"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 )
 
-func (b *BackgroundContext) extractReaction(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntry := log.WithField("prefix", job.Name+"/"+job.ID)
-	accountNumber := job.ArgString("account_number")
-	archiveid := job.ArgInt64("archive_id")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
+func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber string, archiveid int64) error {
+	logEntry := log.WithField("prefix", "extract_reaction")
 
 	var currentOffset int64
 	var total int64
 
-	ctx := context.Background()
 	saver := newStatSaver(b.fbDataStore)
 	counter := newReactionStatCounter(ctx, logEntry, saver, accountNumber)
 
 	var lastTimestamp int64
 	for {
 		// Check-in job
-		job.Checkin(fmt.Sprintf("Fetching reaction batch at offset: %d", currentOffset))
+		logEntry.Debugf("Fetching reaction batch at offset: %d", currentOffset)
 		reactions, t, err := b.bitSocialClient.GetReactions(ctx, accountNumber, "asc", currentOffset)
 		if err != nil {
 			logEntry.Error(err)
@@ -91,12 +83,15 @@ func (b *BackgroundContext) extractReaction(job *work.Job) (err error) {
 	}
 
 	logEntry.Info("Enqueue push notification")
-	if _, err := enqueuer.EnqueueUnique(jobNotificationFinish, work.Q{
-		"account_number": accountNumber,
-		"archive_id":     archiveid,
-	}); err != nil {
-		return err
-	}
+	server.SendTask(&tasks.Signature{
+		Name: jobNotificationFinish,
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: accountNumber,
+			},
+		},
+	})
 
 	// Mark the archive is processed
 	if _, err := b.store.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{

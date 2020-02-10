@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/gin-gonic/gin"
-	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,24 +29,33 @@ func (s *Server) downloadFBArchive(c *gin.Context) {
 	archiveRecord, err := s.store.AddFBArchive(c, account.AccountNumber, time.Unix(params.StartedAt, 0), time.Unix(params.EndedAt, 0))
 	shouldInterupt(err, c)
 
-	args := work.Q{
-		"file_url":       params.FileURL,
-		"raw_cookie":     params.RawCookie,
-		"account_number": account.AccountNumber,
-		"archive_id":     archiveRecord.ID,
-	}
-
-	for k, v := range params.Headers {
-		args["header_"+k] = v
-	}
-
-	job, err := s.backgroundEnqueuer.EnqueueUnique("download_archive", args)
+	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+		Name: "download_archive",
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: params.FileURL,
+			},
+			{
+				Type:  "string",
+				Value: params.RawCookie,
+			},
+			{
+				Type:  "string",
+				Value: account.AccountNumber,
+			},
+			{
+				Type:  "int64",
+				Value: archiveRecord.ID,
+			},
+		},
+	})
 	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 		return
 	}
-	log.Info("Enqueued job with id:", job.ID)
+	log.Info("Enqueued job with id:", job.Signature.UUID)
 
 	c.JSON(http.StatusAccepted, gin.H{"result": "ok"})
 }
@@ -65,45 +74,6 @@ func (s *Server) getAllArchives(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"result": archives,
 	})
-}
-
-func (s *Server) parseArchive(c *gin.Context) {
-	accountNumber := ""
-
-	// For post
-	job, err := s.backgroundEnqueuer.EnqueueUnique("analyze_posts", work.Q{
-		"account_number": accountNumber,
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-	log.Info("Enqueued job with id:", job.ID)
-
-	// For reaction
-	reactionJob, err := s.backgroundEnqueuer.EnqueueUnique("analyze_reactions", work.Q{
-		"account_number": accountNumber,
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-	log.Info("Enqueued job with id:", reactionJob.ID)
-
-	// For sentiment
-	sentimentJob, err := s.backgroundEnqueuer.EnqueueUnique("analyze_sentiments", work.Q{
-		"account_number": accountNumber,
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-	log.Info("Enqueued job with id:", sentimentJob.ID)
-
-	c.JSON(http.StatusAccepted, gin.H{"result": "ok"})
 }
 
 func (s *Server) adminSubmitArchives(c *gin.Context) {
@@ -128,18 +98,30 @@ func (s *Server) adminSubmitArchives(c *gin.Context) {
 
 		archive := archives[0]
 
-		job, err := s.backgroundEnqueuer.EnqueueUnique("upload_archive", work.Q{
-			"s3_key":         archive.S3Key,
-			"account_number": archive.AccountNumber,
-			"archive_id":     archive.ID,
+		job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+			Name: "upload_archive",
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: archive.S3Key,
+				},
+				{
+					Type:  "string",
+					Value: archive.AccountNumber,
+				},
+				{
+					Type:  "int64",
+					Value: archive.ID,
+				},
+			},
 		})
 		if err != nil {
 			log.Debug(err)
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
-		log.Info("Enqueued job with id:", job.ID)
-		result[job.ID] = archive
+		log.Info("Enqueued job with id:", job.Signature.UUID)
+		result[job.Signature.UUID] = archive
 	}
 
 	c.JSON(http.StatusAccepted, result)
@@ -170,24 +152,40 @@ func (s *Server) adminForceParseArchive(c *gin.Context) {
 			continue
 		}
 
-		job, err := s.backgroundEnqueuer.EnqueueUnique("analyze_posts", work.Q{
-			"account_number": accountNumber,
-			"archive_id":     archives[0].ID,
+		job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+			Name: "analyze_posts",
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: accountNumber,
+				},
+				{
+					Type:  "int64",
+					Value: archives[0].ID,
+				},
+			},
 		})
 		if err != nil {
 			log.Debug(err)
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
-		if _, err := s.backgroundEnqueuer.EnqueueUnique("extract_time_metadata", work.Q{
-			"account_number": accountNumber,
+
+		if _, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+			Name: "extract_time_metadata",
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: accountNumber,
+				},
+			},
 		}); err != nil {
 			log.Debug(err)
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
-		log.Info("Enqueued job with id:", job.ID)
-		result[job.ID] = accountNumber
+		log.Info("Enqueued job with id:", job.Signature.UUID)
+		result[job.Signature.UUID] = accountNumber
 	}
 
 	c.JSON(http.StatusAccepted, result)
@@ -218,17 +216,26 @@ func (s *Server) adminGenerateHashContent(c *gin.Context) {
 			continue
 		}
 
-		job, err := s.backgroundEnqueuer.EnqueueUnique("generate_hash_content", work.Q{
-			"s3_key":     archive.S3Key,
-			"archive_id": archive.ID,
+		job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+			Name: "generate_hash_content",
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: archive.S3Key,
+				},
+				{
+					Type:  "int64",
+					Value: archives[0].ID,
+				},
+			},
 		})
 		if err != nil {
 			log.Debug(err)
 			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 			return
 		}
-		log.Info("Enqueued job with id:", job.ID)
-		result[job.ID] = archive
+		log.Info("Enqueued job with id:", job.Signature.UUID)
+		result[job.Signature.UUID] = archive
 	}
 
 	c.JSON(http.StatusAccepted, result)

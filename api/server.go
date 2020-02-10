@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/RichardKnop/machinery/v1"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 
@@ -22,7 +23,6 @@ import (
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/gocraft/work"
 	"github.com/spf13/viper"
 )
 
@@ -52,7 +52,7 @@ type Server struct {
 	httpClient *http.Client
 
 	// job pool enqueuer
-	backgroundEnqueuer *work.Enqueuer
+	backgroundEnqueuer *machinery.Server
 
 	// country continent list
 	countryContinentMap map[string]string
@@ -65,7 +65,7 @@ func NewServer(store store.Store,
 	jwtKey *rsa.PrivateKey,
 	awsConf *aws.Config,
 	bitmarkAccount *account.AccountV2,
-	backgroundEnqueuer *work.Enqueuer) *Server {
+	backgroundEnqueuer *machinery.Server) *Server {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -213,7 +213,6 @@ func (s *Server) setupRouter() *gin.Engine {
 	{
 		secretRoute.POST("/submit-archives", s.adminSubmitArchives)
 		secretRoute.POST("/parse-archives", s.adminForceParseArchive)
-		secretRoute.POST("/reanalyze", s.parseArchive)
 		secretRoute.POST("/generate-hash-content", s.adminGenerateHashContent)
 		secretRoute.POST("/delete-accounts", s.adminAccountDelete)
 	}

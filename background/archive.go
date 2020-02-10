@@ -6,30 +6,21 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"time"
 
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/bitmark-inc/spring-app-api/store"
-	"github.com/gocraft/work"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/sha3"
 )
 
-func (b *BackgroundContext) submitArchive(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-	s3key := job.ArgString("s3_key")
-	archiveid := job.ArgInt64("archive_id")
-	accountNumber := job.ArgString("account_number")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-
+func (b *BackgroundContext) submitArchive(ctx context.Context, s3key, accountNumber string, archiveid int64) error {
+	logEntity := log.WithField("prefix", "submit_archive")
 	// Register data owner
 	if err := b.bitSocialClient.NewDataOwner(ctx, accountNumber); err != nil {
 		log.Debug(err)
@@ -71,7 +62,6 @@ func (b *BackgroundContext) submitArchive(job *work.Job) (err error) {
 	}
 
 	logEntity.Info("Downloaded zip file. Start submiting")
-	job.Checkin("Downloaded zip file. Start submiting")
 
 	taskID, err := b.bitSocialClient.UploadArchives(ctx, tmpFile, accountNumber)
 	if err != nil {
@@ -91,21 +81,22 @@ func (b *BackgroundContext) submitArchive(job *work.Job) (err error) {
 	}
 
 	logEntity.Info("Finish...")
-	enqueuer.EnqueueIn(jobPeriodicArchiveCheck, 120, map[string]interface{}{
-		"archive_id": archiveid,
+	eta := time.Now().Add(time.Second * 120)
+	server.SendTask(&tasks.Signature{
+		Name: jobPeriodicArchiveCheck,
+		ETA:  &eta,
+		Args: []tasks.Arg{
+			{
+				Type:  "int64",
+				Value: archiveid,
+			},
+		},
 	})
 	return nil
 }
 
-func (b *BackgroundContext) checkArchive(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-	archiveid := job.ArgInt64("archive_id")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
-
-	ctx := context.Background()
+func (b *BackgroundContext) checkArchive(ctx context.Context, archiveid int64) error {
+	logEntity := log.WithField("prefix", "check_archive")
 
 	archives, err := b.store.GetFBArchives(ctx, &store.FBArchiveQueryParam{
 		ID: &archiveid,
@@ -138,27 +129,44 @@ func (b *BackgroundContext) checkArchive(job *work.Job) (err error) {
 			return err
 		}
 	case "SUCCESS":
-		if _, err := enqueuer.EnqueueIn(jobAnalyzePosts, 3, work.Q{
-			"account_number": archives[0].AccountNumber,
-			"archive_id":     archiveid,
-		}); err != nil {
-			logEntity.Error(err)
-			return err
-		}
+		server.SendTask(&tasks.Signature{
+			Name: jobAnalyzePosts,
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: archives[0].AccountNumber,
+				},
+				{
+					Type:  "int64",
+					Value: archiveid,
+				},
+			},
+		})
 
-		if _, err := enqueuer.EnqueueUnique(jobExtractTimeMetadata, work.Q{
-			"account_number": archives[0].AccountNumber,
-		}); err != nil {
-			return err
-		}
+		server.SendTask(&tasks.Signature{
+			Name: jobExtractTimeMetadata,
+			Args: []tasks.Arg{
+				{
+					Type:  "string",
+					Value: archives[0].AccountNumber,
+				},
+			},
+		})
 	default:
 		// Retry after 10 minutes
+		eta := time.Now().Add(time.Minute * 10)
+		server.SendTask(&tasks.Signature{
+			Name: jobPeriodicArchiveCheck,
+			ETA:  &eta,
+			Args: []tasks.Arg{
+				{
+					Type:  "int64",
+					Value: archiveid,
+				},
+			},
+		})
+
 		log.Info("Retry after 10 minutes")
-		if _, err := enqueuer.EnqueueIn(jobPeriodicArchiveCheck, 60*10, map[string]interface{}{
-			"archive_id": archiveid,
-		}); err != nil {
-			return err
-		}
 	}
 
 	logEntity.Info("Finish...")
@@ -166,16 +174,8 @@ func (b *BackgroundContext) checkArchive(job *work.Job) (err error) {
 	return nil
 }
 
-func (b *BackgroundContext) generateHashContent(job *work.Job) (err error) {
-	defer jobEndCollectiveMetric(err, job)
-	logEntity := log.WithField("prefix", job.Name+"/"+job.ID)
-	s3key := job.ArgString("s3_key")
-	archiveid := job.ArgInt64("archive_id")
-	if err := job.ArgError(); err != nil {
-		return err
-	}
-
-	ctx := context.Background()
+func (b *BackgroundContext) generateHashContent(ctx context.Context, s3key string, archiveid int64) error {
+	logEntity := log.WithField("prefix", "generate_hash_content")
 
 	sess := session.New(b.awsConf)
 	downloader := s3manager.NewDownloader(sess)
@@ -203,7 +203,6 @@ func (b *BackgroundContext) generateHashContent(job *work.Job) (err error) {
 	}
 
 	logEntity.Info("Downloaded zip file. Start computing fingerprint")
-	job.Checkin("Downloaded zip file. Start computing fingerprint")
 
 	io.Copy(h, tmpFile)
 
@@ -222,8 +221,5 @@ func (b *BackgroundContext) generateHashContent(job *work.Job) (err error) {
 	}
 
 	logEntity.Info("Finish...")
-	enqueuer.EnqueueIn(jobPeriodicArchiveCheck, 120, map[string]interface{}{
-		"archive_id": archiveid,
-	})
 	return nil
 }

@@ -145,8 +145,8 @@ func (s *Server) getPostMediaURI(c *gin.Context) {
 
 func (s *Server) postsCountStats(c *gin.Context) {
 	var params struct {
-		From time.Time `form:"from" time_format:"unix"`
-		To   time.Time `form:"to" time_format:"unix"`
+		From time.Time `form:"started_at" time_format:"unix"`
+		To   time.Time `form:"ended_at" time_format:"unix"`
 	}
 
 	if err := c.BindQuery(&params); err != nil {
@@ -172,8 +172,8 @@ func (s *Server) postsCountStats(c *gin.Context) {
 
 func (s *Server) reactionsCountStats(c *gin.Context) {
 	var params struct {
-		From time.Time `form:"from" time_format:"unix"`
-		To   time.Time `form:"to" time_format:"unix"`
+		From time.Time `form:"started_at" time_format:"unix"`
+		To   time.Time `form:"ended_at" time_format:"unix"`
 	}
 
 	if err := c.BindQuery(&params); err != nil {

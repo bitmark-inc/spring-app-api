@@ -33,6 +33,7 @@ import (
 	backendsiface "github.com/RichardKnop/machinery/v1/backends/iface"
 	brokersiface "github.com/RichardKnop/machinery/v1/brokers/iface"
 	machinerycnf "github.com/RichardKnop/machinery/v1/config"
+	machinerylog "github.com/RichardKnop/machinery/v1/log"
 	"github.com/RichardKnop/machinery/v1/tasks"
 )
 
@@ -198,7 +199,6 @@ func main() {
 	var cnf = &machinerycnf.Config{
 		Broker:        viper.GetString("redis.conn"),
 		DefaultQueue:  "fbm_background",
-		ResultBackend: viper.GetString("redis.conn"),
 		NoUnixSignals: false,
 	}
 	s, err := machinery.NewServer(cnf)
@@ -206,6 +206,7 @@ func main() {
 		log.Panic(err)
 	}
 	server = s
+	machinerylog.Set(&logmodule.MachineryLogger{Prefix: "machinery"})
 
 	server.RegisterTask(jobDownloadArchive, b.downloadArchive)
 	server.RegisterTask(jobUploadArchive, b.submitArchive)

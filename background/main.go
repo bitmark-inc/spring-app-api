@@ -200,6 +200,7 @@ func main() {
 		Broker:        viper.GetString("redis.conn"),
 		DefaultQueue:  "fbm_background",
 		NoUnixSignals: false,
+		ResultBackend: viper.GetString("redis.conn"),
 	}
 	s, err := machinery.NewServer(cnf)
 	if err != nil {

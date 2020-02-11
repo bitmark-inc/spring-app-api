@@ -182,9 +182,8 @@ func main() {
 
 	// Init redis
 	var cnf = &machinerycnf.Config{
-		Broker:        viper.GetString("redis.conn"),
-		DefaultQueue:  "fbm_background",
-		ResultBackend: viper.GetString("redis.conn"),
+		Broker:       viper.GetString("redis.conn"),
+		DefaultQueue: "fbm_background",
 	}
 	machineryServer, err := machinery.NewServer(cnf)
 	if err != nil {

@@ -159,6 +159,31 @@ func (p *PGStore) GetFBArchives(ctx context.Context, params *store.FBArchiveQuer
 	return fbarchives, nil
 }
 
+func (p *PGStore) DeleteFBArchives(ctx context.Context, params *store.FBArchiveQueryParam) error {
+	q := psql.Delete("fbm.fbarchive")
+
+	if params.ID != nil {
+		q = q.Where(sq.Eq{"id": *params.ID})
+	}
+
+	if params.S3Key != nil {
+		q = q.Where(sq.Eq{"file_key": *params.S3Key})
+	}
+
+	if params.AccountNumber != nil {
+		q = q.Where(sq.Eq{"account_number": *params.AccountNumber})
+	}
+
+	if params.Status != nil {
+		q = q.Where(sq.Eq{"processing_status": *params.Status})
+	}
+
+	st, val, _ := q.ToSql()
+
+	_, err := p.pool.Exec(ctx, st, val...)
+	return err
+}
+
 // AddFBStat to add a FB stat
 func (p *PGStore) AddFBStat(ctx context.Context, key string, value interface{}) error {
 	q := psql.Insert("fbm.fbdata").Values(key, value)

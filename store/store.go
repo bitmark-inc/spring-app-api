@@ -40,6 +40,9 @@ type Store interface {
 	// GetFBArchives to fetch all fb archives
 	GetFBArchives(ctx context.Context, params *FBArchiveQueryParam) ([]FBArchive, error)
 
+	// DeleteFBArchives to delete fbarchives with conditions
+	DeleteFBArchives(ctx context.Context, params *FBArchiveQueryParam) error
+
 	// Metrics
 
 	// CountAccountCreation to count account creation for a specific time range

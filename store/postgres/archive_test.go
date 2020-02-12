@@ -73,4 +73,17 @@ func Test_FBArchive(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Len(t, archives, 1)
+
+	// Delete archive
+	err = s.DeleteFBArchives(ctx, &store.FBArchiveQueryParam{
+		ID: &correctID,
+	})
+	assert.NoError(t, err)
+
+	// Query archives again
+	archives, err = s.GetFBArchives(ctx, &store.FBArchiveQueryParam{
+		ID: &correctID,
+	})
+	assert.NoError(t, err)
+	assert.Len(t, archives, 0)
 }

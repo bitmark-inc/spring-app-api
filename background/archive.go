@@ -63,7 +63,14 @@ func (b *BackgroundContext) submitArchive(ctx context.Context, s3key, accountNum
 
 	logEntity.Info("Downloaded zip file. Start submiting")
 
-	taskID, err := b.bitSocialClient.UploadArchives(ctx, tmpFile, accountNumber)
+	archiveID, err := b.bitSocialClient.UploadArchives(ctx, tmpFile, accountNumber)
+	if err != nil {
+		logEntity.Error(err)
+		return err
+	}
+
+	logEntity.Info("Trigger parsing")
+	taskID, err := b.bitSocialClient.TriggerParsing(ctx, archiveID, accountNumber)
 	if err != nil {
 		logEntity.Error(err)
 		return err

@@ -24,7 +24,6 @@ func (b *BackgroundContext) submitArchive(ctx context.Context, s3key, accountNum
 	// Register data owner
 	if err := b.bitSocialClient.NewDataOwner(ctx, accountNumber); err != nil {
 		log.Debug(err)
-		return err
 	}
 
 	// Set status to processing
@@ -126,7 +125,7 @@ func (b *BackgroundContext) checkArchive(ctx context.Context, archiveid int64) e
 	log.Info("Receive status: ", status)
 
 	switch status {
-	case "FAILURE":
+	case "FAILED":
 		if _, err := b.store.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
 			ID: &archiveid,
 		}, &store.FBArchiveQueryParam{
@@ -135,7 +134,7 @@ func (b *BackgroundContext) checkArchive(ctx context.Context, archiveid int64) e
 			logEntity.Error(err)
 			return err
 		}
-	case "SUCCESS":
+	case "FINISHED":
 		server.SendTask(&tasks.Signature{
 			Name: jobAnalyzePosts,
 			Args: []tasks.Arg{
@@ -159,6 +158,9 @@ func (b *BackgroundContext) checkArchive(ctx context.Context, archiveid int64) e
 				},
 			},
 		})
+	case "INTERRUPTED":
+		logEntity.Warn("Task interrupted")
+		return nil
 	default:
 		// Retry after 10 minutes
 		eta := time.Now().Add(time.Minute * 10)

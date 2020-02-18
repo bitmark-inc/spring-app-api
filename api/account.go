@@ -38,11 +38,24 @@ func (s *Server) accountRegister(c *gin.Context) {
 		return
 	}
 
-	// Register data owner
-	if err := s.bitSocialClient.NewDataOwner(c, accountNumber); err != nil {
+	// Check if the account status
+	status, err := s.bitSocialClient.GetDataOwnerStatus(c, accountNumber)
+	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
 		return
+	}
+
+	if status == "DELETING" {
+		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
+		return
+	} else if status == "" {
+		// Register data owner
+		if err := s.bitSocialClient.NewDataOwner(c, accountNumber); err != nil {
+			log.Debug(err)
+			abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
+			return
+		}
 	}
 
 	// Save to db
@@ -69,6 +82,22 @@ func (s *Server) accountRegister(c *gin.Context) {
 
 func (s *Server) accountDetail(c *gin.Context) {
 	accountNumber := c.GetString("account_number")
+
+	log.Debug("Check data owner")
+
+	// Check if the account status
+	status, err := s.bitSocialClient.GetDataOwnerStatus(c, accountNumber)
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
+		return
+	}
+
+	if status == "DELETING" {
+		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
+		return
+	}
+
 	account, err := s.store.QueryAccount(c, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	})

@@ -53,11 +53,53 @@ func (c *Client) NewDataOwner(ctx context.Context, publicKey string) error {
 		return err
 	}
 
+	// Print out the response in console log
+	dumpBytes, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.WithContext(ctx).WithField("prefix", "fbarchive").WithField("resp", string(dumpBytes)).Debug("response from data analysis server")
+
 	if resp.StatusCode < 300 {
 		return nil
 	}
 
 	return errors.New("error when creating data owner")
+}
+
+func (c *Client) GetDataOwnerStatus(ctx context.Context, publicKey string) (string, error) {
+	r, _ := c.createRequest(ctx, "GET", "/data_owners/"+publicKey, nil)
+	resp, err := c.httpClient.Do(r)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+
+	// Print out the response in console log
+	dumpBytes, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.WithContext(ctx).WithField("prefix", "fbarchive").WithField("resp", string(dumpBytes)).Debug("response from data analysis server")
+
+	decoder := json.NewDecoder(resp.Body)
+	var respBody struct {
+		PublicKey string `json:"public_key"`
+		Status    string `json:"status"`
+	}
+
+	if err := decoder.Decode(&respBody); err != nil {
+		return "", err
+	}
+
+	return respBody.Status, nil
 }
 
 func (c *Client) DeleteDataOwner(ctx context.Context, publicKey string) error {
@@ -162,16 +204,17 @@ func (c *Client) TriggerParsing(ctx context.Context, archiveID, dataOwner string
 
 	decoder := json.NewDecoder(resp.Body)
 	var respBody struct {
-		TaskID string `json:"archive"`
-		ID     int    `json:"id"`
-		Status string `json:"status"`
+		ID        string `json:"id"`
+		DataOwner string `json:"data_owner"`
+		Archive   string `json:"archive"`
+		Status    string `json:"status"`
 	}
 
 	if err := decoder.Decode(&respBody); err != nil {
 		return "", err
 	}
 
-	return respBody.Status, nil
+	return respBody.ID, nil
 }
 
 func (c *Client) GetArchiveTaskStatus(ctx context.Context, taskID string) (string, error) {
@@ -183,9 +226,10 @@ func (c *Client) GetArchiveTaskStatus(ctx context.Context, taskID string) (strin
 
 	decoder := json.NewDecoder(resp.Body)
 	var respBody struct {
-		TaskID string `json:"task_id"`
-		ID     int    `json:"id"`
-		Status string `json:"status"`
+		ID        string `json:"id"`
+		DataOwner string `json:"data_owner"`
+		Archive   string `json:"archive"`
+		Status    string `json:"status"`
 	}
 
 	if err := decoder.Decode(&respBody); err != nil {

@@ -150,9 +150,12 @@ func (s *Server) setupRouter() *gin.Engine {
 		accountRoute.POST("", s.accountRegister)
 	}
 	accountRoute.Use(s.meRoute("me"))
-	accountRoute.Use(s.recognizeAccountMiddleware())
 	{
 		accountRoute.GET("/:account_number", s.accountDetail)
+	}
+	accountRoute.Use(s.meRoute("me"))
+	accountRoute.Use(s.recognizeAccountMiddleware())
+	{
 		accountRoute.PATCH("/:account_number", s.accountUpdateMetadata)
 		accountRoute.DELETE("/:account_number", s.accountDelete)
 	}

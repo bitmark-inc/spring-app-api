@@ -162,6 +162,10 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 	}
 
 	// Calculate original location
+	accountMetadata := map[string]interface{}{
+		"original_timestamp":        counter.earliestPostTimestamp,
+		"latest_activity_timestamp": counter.latestPostTimestamp,
+	}
 	if counter.lastLocation != nil {
 		logEntity.Info("Parsing location")
 		geoCodingData, err := b.geoServiceClient.ReverseGeocode(ctx,
@@ -171,17 +175,15 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 			return err
 		}
 
-		logEntity.Info("Update to db with account number: ", accountNumber)
-		// Get user and update
-		if _, err := b.store.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
-			AccountNumber: &accountNumber,
-		}, map[string]interface{}{
-			"original_location":         geoCodingData.Address.CountryCode,
-			"original_timestamp":        counter.earliestPostTimestamp,
-			"latest_activity_timestamp": counter.latestPostTimestamp,
-		}); err != nil {
-			return err
-		}
+		accountMetadata["original_location"] = geoCodingData.Address.CountryCode
+	}
+
+	logEntity.Info("Update to db with account number: ", accountNumber)
+	// Get user and update
+	if _, err := b.store.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
+		AccountNumber: &accountNumber,
+	}, accountMetadata); err != nil {
+		return err
 	}
 
 	logEntity.Info("Enqueue parsing reaction")

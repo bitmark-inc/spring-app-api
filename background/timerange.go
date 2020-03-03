@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 
-	"github.com/bitmark-inc/spring-app-api/store"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/bitmark-inc/spring-app-api/schema/facebook"
+	"github.com/bitmark-inc/spring-app-api/store"
 )
 
 func (b *BackgroundContext) extractTimeMetadata(ctx context.Context, accountNumber string) error {
@@ -14,35 +16,36 @@ func (b *BackgroundContext) extractTimeMetadata(ctx context.Context, accountNumb
 	var lastReactionTimestamp int64 = 0
 
 	// Get last post and reaction time.
-	lastPost, err := b.bitSocialClient.GetLastPost(ctx, accountNumber)
-	if err != nil {
+	var lastPost facebook.PostORM
+	if err := b.ormDB.Order("timestamp DESC").First(&lastPost).Error; err != nil {
 		return err
 	}
 
-	if lastPost != nil {
+	if lastPost.Timestamp > 0 {
 		lastPostTimestamp = lastPost.Timestamp
 	}
 
-	lastReaction, err := b.bitSocialClient.GetLastReaction(ctx, accountNumber)
-	if err != nil {
+	var lastReaction facebook.ReactionORM
+	if err := b.ormDB.Order("timestamp DESC").First(&lastReaction).Error; err != nil {
 		return err
 	}
 
-	if lastReaction != nil {
-		lastPostTimestamp = lastReaction.Timestamp
+	if lastReaction.Timestamp > 0 {
+		lastReactionTimestamp = lastReaction.Timestamp
 	}
 
-	lastActivityTimestamp := lastPostTimestamp
-	if lastActivityTimestamp < lastReactionTimestamp {
-		lastActivityTimestamp = lastReactionTimestamp
+	latestActivityTimestamp := lastPostTimestamp
+	if latestActivityTimestamp < lastReactionTimestamp {
+		latestActivityTimestamp = lastReactionTimestamp
 	}
 
 	if _, err := b.store.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	}, map[string]interface{}{
-		"last_post_timestamp":     lastPostTimestamp,
-		"last_reaction_timestamp": lastReactionTimestamp,
-		"last_activity_timestamp": lastActivityTimestamp,
+		"last_post_timestamp":       lastPostTimestamp,
+		"last_reaction_timestamp":   lastReactionTimestamp,
+		"last_activity_timestamp":   latestActivityTimestamp,
+		"latest_activity_timestamp": latestActivityTimestamp,
 	}); err != nil {
 		return err
 	}

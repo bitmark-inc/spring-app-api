@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strconv"
-	"time"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/timeutil"
 	"github.com/getsentry/sentry-go"
@@ -19,56 +17,39 @@ import (
 func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber string, archiveid int64) error {
 	logEntry := log.WithField("prefix", "extract_reaction")
 
-	var currentOffset int64
-	var total int64
-
 	saver := newStatSaver(b.fbDataStore)
 	counter := newReactionStatCounter(ctx, logEntry, saver, accountNumber)
 
 	var lastTimestamp int64
-	for {
-		// Check-in job
-		logEntry.Debugf("Fetching reaction batch at offset: %d", currentOffset)
-		reactions, t, err := b.bitSocialClient.GetReactions(ctx, accountNumber, "asc", currentOffset)
-		if err != nil {
+
+	// Save to db & count
+	reactions := make([]facebook.ReactionORM, 0)
+	b.ormDB.Where(&facebook.ReactionORM{DataOwnerID: accountNumber}).
+		Order("timestamp ASC").Find(&reactions)
+
+	for _, reaction := range reactions {
+		if lastTimestamp == reaction.Timestamp {
+			continue
+		}
+		lastTimestamp = reaction.Timestamp
+
+		reactionData, _ := proto.Marshal(&protomodel.Reaction{
+			ReactionId: reaction.ID.String(),
+			Timestamp:  reaction.Timestamp,
+			Title:      reaction.Title,
+			Actor:      reaction.Actor,
+			Reaction:   reaction.Reaction,
+		})
+		if err := saver.save(accountNumber+"/reaction", reaction.Timestamp, reactionData); err != nil {
 			logEntry.Error(err)
-			sentry.CaptureException(errors.New("Request reactions failed for onwer " + accountNumber))
+			sentry.CaptureException(err)
 			return err
 		}
-		currentOffset += int64(len(reactions))
-		total = t
 
-		logEntry.WithField("Total", total).WithField("Offset: ", currentOffset).Info("Querying reactions at ", time.Now().Format("15:04:05"))
-
-		// Save to db & count
-		for _, reaction := range reactions {
-			if lastTimestamp == reaction.Timestamp {
-				continue
-			}
-			lastTimestamp = reaction.Timestamp
-
-			reactionData, _ := proto.Marshal(&protomodel.Reaction{
-				ReactionId: reaction.ID,
-				Timestamp:  reaction.Timestamp,
-				Title:      reaction.Title,
-				Actor:      reaction.Actor,
-				Reaction:   reaction.Reaction,
-			})
-			if err := saver.save(accountNumber+"/reaction", reaction.Timestamp, reactionData); err != nil {
-				logEntry.Error(err)
-				sentry.CaptureException(err)
-				return err
-			}
-
-			if err := counter.count(reaction); err != nil {
-				logEntry.Error(err)
-				sentry.CaptureException(err)
-				return err
-			}
-		}
-
-		if currentOffset >= total {
-			break
+		if err := counter.count(reaction); err != nil {
+			logEntry.Error(err)
+			sentry.CaptureException(err)
+			return err
 		}
 	}
 
@@ -82,6 +63,17 @@ func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber s
 		sentry.CaptureException(err)
 		return err
 	}
+
+	logEntry.Info("Enqueue parsing time meta")
+	server.SendTask(&tasks.Signature{
+		Name: jobExtractTimeMetadata,
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: accountNumber,
+			},
+		},
+	})
 
 	logEntry.Info("Enqueue push notification")
 	server.SendTask(&tasks.Signature{
@@ -186,7 +178,7 @@ func (r *reactionStatCounter) flush() error {
 	return nil
 }
 
-func (r *reactionStatCounter) count(reaction fbarchive.ReactionData) error {
+func (r *reactionStatCounter) count(reaction facebook.ReactionORM) error {
 	if err := r.countWeek(reaction); err != nil {
 		return err
 	}
@@ -199,7 +191,7 @@ func (r *reactionStatCounter) count(reaction fbarchive.ReactionData) error {
 	return nil
 }
 
-func (r *reactionStatCounter) countWeek(reaction fbarchive.ReactionData) error {
+func (r *reactionStatCounter) countWeek(reaction facebook.ReactionORM) error {
 	periodTimestamp := timeutil.AbsWeek(reaction.Timestamp)
 
 	// Release the current period if next period has come
@@ -235,7 +227,7 @@ func (r *reactionStatCounter) countWeek(reaction fbarchive.ReactionData) error {
 	return nil
 }
 
-func (r *reactionStatCounter) countYear(reaction fbarchive.ReactionData) error {
+func (r *reactionStatCounter) countYear(reaction facebook.ReactionORM) error {
 	periodTimestamp := timeutil.AbsYear(reaction.Timestamp)
 
 	// Release the current period if next period has come
@@ -271,7 +263,7 @@ func (r *reactionStatCounter) countYear(reaction fbarchive.ReactionData) error {
 	return nil
 }
 
-func (r *reactionStatCounter) countDecade(reaction fbarchive.ReactionData) error {
+func (r *reactionStatCounter) countDecade(reaction facebook.ReactionORM) error {
 	periodTimestamp := timeutil.AbsDecade(reaction.Timestamp)
 
 	// Release the current period if next period has come

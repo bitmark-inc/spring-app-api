@@ -13,6 +13,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/RichardKnop/machinery/v1"
+	backendsiface "github.com/RichardKnop/machinery/v1/backends/iface"
+	brokersiface "github.com/RichardKnop/machinery/v1/brokers/iface"
+	machinerycnf "github.com/RichardKnop/machinery/v1/config"
+	machinerylog "github.com/RichardKnop/machinery/v1/log"
+	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
 	bitmarksdk "github.com/bitmark-inc/bitmark-sdk-go"
 	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
@@ -23,18 +29,13 @@ import (
 	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/getsentry/sentry-go"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/RichardKnop/machinery/v1"
-	backendsiface "github.com/RichardKnop/machinery/v1/backends/iface"
-	brokersiface "github.com/RichardKnop/machinery/v1/brokers/iface"
-	machinerycnf "github.com/RichardKnop/machinery/v1/config"
-	machinerylog "github.com/RichardKnop/machinery/v1/log"
-	"github.com/RichardKnop/machinery/v1/tasks"
 )
 
 var (
@@ -47,6 +48,7 @@ var (
 
 const (
 	jobDownloadArchive      = "download_archive"
+	jobParseArchive         = "parse_archive"
 	jobExtract              = "extract_zip"
 	jobUploadArchive        = "upload_archive"
 	jobPeriodicArchiveCheck = "periodic_archive_check"
@@ -63,6 +65,8 @@ type BackgroundContext struct {
 	// Stores
 	store       store.Store
 	fbDataStore store.FBDataStore
+
+	ormDB *gorm.DB
 
 	// AWS Config
 	awsConf *aws.Config
@@ -180,9 +184,15 @@ func main() {
 		log.Panic(err)
 	}
 
+	ormDB, err := gorm.Open("postgres", viper.GetString("orm.conn"))
+	if err != nil {
+		log.Panic(err)
+	}
+
 	b := &BackgroundContext{
 		fbDataStore:      dynamodbStore,
 		store:            pgstore,
+		ormDB:            ormDB,
 		awsConf:          awsConf,
 		httpClient:       httpClient,
 		oneSignalClient:  oneSignalClient,
@@ -210,8 +220,9 @@ func main() {
 	machinerylog.Set(&logmodule.MachineryLogger{Prefix: "machinery"})
 
 	server.RegisterTask(jobDownloadArchive, b.downloadArchive)
-	server.RegisterTask(jobUploadArchive, b.submitArchive)
-	server.RegisterTask(jobPeriodicArchiveCheck, b.checkArchive)
+	server.RegisterTask(jobParseArchive, b.parseArchive)
+	// server.RegisterTask(jobUploadArchive, b.submitArchive)
+	// server.RegisterTask(jobPeriodicArchiveCheck, b.checkArchive)
 	server.RegisterTask(jobAnalyzePosts, b.extractPost)
 	server.RegisterTask(jobAnalyzeReactions, b.extractReaction)
 	server.RegisterTask(jobAnalyzeSentiments, b.extractSentiment)

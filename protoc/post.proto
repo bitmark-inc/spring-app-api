@@ -21,12 +21,12 @@ message MediaData {
 }
 
 message Tag {
-    int64 id = 1 [json_name="id", (gogoproto.jsontag)="id"];
+    string id = 1 [json_name="id", (gogoproto.jsontag)="id"];
     string name = 2 [json_name="name", (gogoproto.jsontag)="name"];
 }
 
 message Post {
-    int64 id = 1 [json_name="id", (gogoproto.jsontag)="id"];
+    string id = 1 [json_name="id", (gogoproto.jsontag)="id"];
     string post = 2 [json_name="post", (gogoproto.jsontag)="post"];
     int64 timestamp = 3 [json_name="timestamp", (gogoproto.jsontag)="timestamp"];
     string title = 4 [json_name="title", (gogoproto.jsontag)="title"];

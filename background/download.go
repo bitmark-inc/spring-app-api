@@ -13,15 +13,14 @@ import (
 	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"golang.org/x/crypto/sha3"
 )
 
-func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCookie, accountNumber string, archiveid int64) error {
+func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiveType, rawCookie, accountNumber string, archiveid int64) error {
 	logEntity := log.WithField("prefix", "download_archive")
 
 	req, err := http.NewRequestWithContext(ctx, "GET", fileURL, nil)
@@ -30,7 +29,9 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCoo
 		return err
 	}
 
-	req.Header.Set("Cookie", rawCookie)
+	if rawCookie != "" {
+		req.Header.Set("Cookie", rawCookie)
+	}
 
 	reqDump, err := httputil.DumpRequest(req, true)
 	if err != nil {
@@ -43,6 +44,7 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCoo
 		logEntity.Error(err)
 		return err
 	}
+	defer resp.Body.Close()
 
 	// Print out the response in console log
 	dumpBytes, err := httputil.DumpResponse(resp, false)
@@ -58,9 +60,6 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCoo
 		return nil
 	}
 
-	sess := session.New(b.awsConf)
-	svc := s3manager.NewUploader(sess)
-
 	_, p, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
 	if err != nil {
 		logEntity.Error(err)
@@ -69,22 +68,17 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCoo
 	}
 	filename := p["filename"]
 
-	h := sha3.New512()
-	teeReader := io.TeeReader(resp.Body, h)
-
-	defer resp.Body.Close()
+	sess := session.New(b.awsConf)
 
 	logEntity.Info("Start uploading to S3")
 
-	s3key := "archives/" + accountNumber + "/" + filename
-	_, err = svc.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(viper.GetString("aws.s3.bucket")),
-		Key:    aws.String(s3key),
-		Body:   teeReader,
-		Metadata: map[string]*string{
-			"url":        aws.String(fileURL),
-			"archive_id": aws.String(strconv.FormatInt(archiveid, 10)),
-		},
+	h := sha3.New512()
+	teeReader := io.TeeReader(resp.Body, h)
+
+	s3key, err := s3util.UploadArchive(sess, teeReader, accountNumber, archiveType, filename, archiveid, map[string]*string{
+		"url":          aws.String(fileURL),
+		"archive_type": aws.String(archiveType),
+		"archive_id":   aws.String(strconv.FormatInt(archiveid, 10)),
 	})
 
 	if err != nil {
@@ -109,11 +103,11 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, rawCoo
 	}
 
 	server.SendTask(&tasks.Signature{
-		Name: jobUploadArchive,
+		Name: jobParseArchive,
 		Args: []tasks.Arg{
 			{
 				Type:  "string",
-				Value: s3key,
+				Value: archiveType,
 			},
 			{
 				Type:  "string",

@@ -11,19 +11,20 @@ import (
 	"time"
 
 	"github.com/RichardKnop/machinery/v1"
-	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/aws/aws-sdk-go/aws"
+	sentrygin "github.com/getsentry/sentry-go/gin"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/gogo/protobuf/proto"
+	"github.com/jinzhu/gorm"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
 	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
 	"github.com/bitmark-inc/spring-app-api/external/onesignal"
 	"github.com/bitmark-inc/spring-app-api/logmodule"
 	"github.com/bitmark-inc/spring-app-api/store"
-	sentrygin "github.com/getsentry/sentry-go/gin"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 )
 
 // Server to run a http server instance
@@ -40,6 +41,8 @@ type Server struct {
 
 	// AWS Config
 	awsConf *aws.Config
+
+	ormDB *gorm.DB
 
 	// External services
 	oneSignalClient *onesignal.OneSignalClient
@@ -62,6 +65,7 @@ type Server struct {
 // NewServer new instance of server
 func NewServer(store store.Store,
 	fbDataStore store.FBDataStore,
+	ormDB *gorm.DB,
 	jwtKey *rsa.PrivateKey,
 	awsConf *aws.Config,
 	bitmarkAccount *account.AccountV2,
@@ -77,6 +81,7 @@ func NewServer(store store.Store,
 	return &Server{
 		store:              store,
 		fbDataStore:        fbDataStore,
+		ormDB:              ormDB,
 		jwtPrivateKey:      jwtKey,
 		awsConf:            awsConf,
 		httpClient:         httpClient,
@@ -164,7 +169,9 @@ func (s *Server) setupRouter() *gin.Engine {
 	archivesRoute.Use(s.authMiddleware())
 	archivesRoute.Use(s.recognizeAccountMiddleware())
 	{
-		archivesRoute.POST("", s.downloadFBArchive)
+		// archivesRoute.POST("", s.downloadFBArchive)
+		archivesRoute.POST("", s.uploadArchive)
+		archivesRoute.POST("url", s.uploadArchiveByURL)
 		archivesRoute.GET("", s.getAllArchives)
 	}
 

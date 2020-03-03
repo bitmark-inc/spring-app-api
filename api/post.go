@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/protobuf/proto"
@@ -127,20 +129,19 @@ func (s *Server) getPostStats(c *gin.Context) {
 
 func (s *Server) getPostMediaURI(c *gin.Context) {
 	key := c.Query("key")
-	keyDecoded, err := url.QueryUnescape(key)
+	s3Key, err := url.QueryUnescape(key)
 	if key == "" {
 		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 		return
 	}
 
-	uri, err := s.bitSocialClient.GetMediaPresignedURI(c, keyDecoded)
+	sess := session.New(s.awsConf)
+	url, err := s3util.GetMediaPresignedURL(sess, s3Key, 5*time.Minute)
 	if shouldInterupt(err, c) {
 		return
 	}
 
-	log.Debug(uri)
-
-	c.Redirect(http.StatusSeeOther, uri)
+	c.Redirect(http.StatusSeeOther, url)
 }
 
 func (s *Server) postsCountStats(c *gin.Context) {
@@ -159,12 +160,74 @@ func (s *Server) postsCountStats(c *gin.Context) {
 		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 		return
 	}
+	log.Debug(params.From, params.To)
 
 	account := c.MustGet("account").(*store.Account)
 
-	stats, err := s.bitSocialClient.GetPostsStats(c, params.From.Unix(), params.To.Unix(), account.AccountNumber)
-	if shouldInterupt(err, c) {
+	allStatsRows, err := s.ormDB.Raw(`SELECT post_type, count(post_type) FROM (
+		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
+			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
+			         WHEN post is not null THEN 'update'
+			  	     ELSE 'undefined' END) AS post_type FROM facebook_post
+		) AS t GROUP BY post_type`).Rows()
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
 		return
+	}
+	defer allStatsRows.Close()
+
+	accountStatsRows, err := s.ormDB.Raw(`SELECT post_type, count(post_type) FROM (
+		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
+			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
+			         WHEN post is not null THEN 'update'
+			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE data_owner_id = ?
+		) AS t GROUP BY post_type;`, account.AccountNumber).Rows()
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+	defer accountStatsRows.Close()
+
+	stats := map[string]map[string]int64{
+		"link": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"media": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"undefined": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"update": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+	}
+
+	for allStatsRows.Next() {
+		var t string
+		var count int64
+		if err := allStatsRows.Scan(&t, &count); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		}
+
+		stats[t]["sys_avg"] = count
+	}
+
+	for accountStatsRows.Next() {
+		var t string
+		var count int64
+		if err := accountStatsRows.Scan(&t, &count); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		}
+		stats[t]["count"] = count
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": stats})
@@ -189,9 +252,71 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 
 	account := c.MustGet("account").(*store.Account)
 
-	stats, err := s.bitSocialClient.GetReactionsStats(c, params.From.Unix(), params.To.Unix(), account.AccountNumber)
-	if shouldInterupt(err, c) {
+	allStatsRows, err := s.ormDB.Raw(`SELECT reaction, count(reaction)
+		FROM facebook_reaction GROUP BY reaction`).Rows()
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
+	}
+	defer allStatsRows.Close()
+
+	accountStatsRows, err := s.ormDB.Raw(`SELECT reaction, count(reaction)
+		FROM facebook_reaction
+		WHERE data_owner_id = ? GROUP BY reaction`, account.AccountNumber).Rows()
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+	defer accountStatsRows.Close()
+
+	stats := map[string]map[string]int64{
+		"ANGER": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"HAHA": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"LIKE": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"LOVE": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"SORRY": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+		"WOW": map[string]int64{
+			"sys_avg": 0,
+			"count":   0,
+		},
+	}
+
+	for allStatsRows.Next() {
+		var t string
+		var count int64
+		if err := allStatsRows.Scan(&t, &count); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		}
+
+		stats[t]["sys_avg"] = count
+	}
+
+	for accountStatsRows.Next() {
+		var t string
+		var count int64
+		if err := accountStatsRows.Scan(&t, &count); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		}
+		stats[t]["count"] = count
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": stats})

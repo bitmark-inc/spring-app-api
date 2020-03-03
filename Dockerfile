@@ -10,12 +10,14 @@ RUN go mod download
 ADD . .
 
 RUN go install github.com/bitmark-inc/spring-app-api
+RUN go install github.com/bitmark-inc/spring-app-api/schema/facebook/migrate
 
 # ---
 
 FROM alpine:3.10.3
 ARG dist=0.0
 COPY --from=build /go/bin/spring-app-api /
+COPY --from=build /go/bin/migrate /
 
 COPY assets /assets
 

@@ -16,6 +16,14 @@ import (
 	"github.com/RichardKnop/machinery/v1"
 	machinerycnf "github.com/RichardKnop/machinery/v1/config"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/getsentry/sentry-go"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+
 	bitmarksdk "github.com/bitmark-inc/bitmark-sdk-go"
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
 	"github.com/bitmark-inc/spring-app-api/api"
@@ -23,12 +31,6 @@ import (
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/getsentry/sentry-go"
-
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -196,9 +198,15 @@ func main() {
 		log.Panic(err)
 	}
 
+	ormDB, err := gorm.Open("postgres", viper.GetString("orm.conn"))
+	if err != nil {
+		log.Panic(err)
+	}
+
 	// Init http server
 	server = api.NewServer(s,
 		dynamodbStore,
+		ormDB,
 		jwtPrivateKey,
 		awsConf,
 		globalAccount,

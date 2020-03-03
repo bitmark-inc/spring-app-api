@@ -6,125 +6,115 @@ import (
 	"time"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/bitmark-inc/spring-app-api/protomodel"
+	"github.com/bitmark-inc/spring-app-api/schema/facebook"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/timeutil"
 )
 
 func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber string, archiveid int64) error {
 	logEntity := log.WithField("prefix", "extract_post")
 	counter := newPostStatisticCounter()
-	currentOffset := 0
 
 	saver := newStatSaver(b.fbDataStore)
 
 	lastPostTimestamp := time.Now().Unix()
 
-	for {
-		postRespData, err := b.bitSocialClient.GetPosts(ctx, accountNumber, currentOffset)
-		if err != nil {
-			return err
+	// Fetch posts from db
+	posts := make([]facebook.PostORM, 0)
+	b.ormDB.Preload("MediaItems").
+		Preload("Places").
+		Preload("Tags").
+		Where(&facebook.PostORM{DataOwnerID: accountNumber}).
+		Order("timestamp ASC").Find(&posts)
+
+	// Save to dynamodb
+	for _, p := range posts {
+		postType := ""
+		media := make([]*protomodel.MediaData, 0)
+
+		if p.MediaAttached {
+			postType = "media"
+			for _, m := range p.MediaItems {
+				mediaType := "photo"
+				if m.FilenameExtension == ".mp4" {
+					mediaType = "video"
+				}
+				media = append(media, &protomodel.MediaData{
+					Type:      mediaType,
+					Source:    m.MediaURI,
+					Thumbnail: m.MediaURI,
+				})
+			}
+		} else if p.ExternalContextURL != "" {
+			postType = "link"
+		} else if p.Post != "" {
+			postType = "update"
+		} else {
+			continue
 		}
 
-		logEntity.Info("Getting page offset: ", currentOffset)
+		var l *protomodel.Location
+		if len(p.Places) > 0 {
+			firstPlace := p.Places[0]
+			lat := firstPlace.Latitude
+			long := firstPlace.Longitude
+			l = &protomodel.Location{
+				Address: firstPlace.Address,
+				Coordinate: &protomodel.Coordinate{
+					Latitude:  lat,
+					Longitude: long,
+				},
+				Name:      firstPlace.Name,
+				CreatedAt: p.Timestamp,
+			}
 
-		// Save to db
-		for _, r := range postRespData.Results {
-			postType := ""
-			media := make([]*protomodel.MediaData, 0)
+			counter.lastLocation = l.GetCoordinate()
+		}
 
-			if r.MediaAttached {
-				postType = "media"
-				for _, m := range r.PostMedia {
-					mediaType := "photo"
-					if m.FilenameExtension == ".mp4" {
-						mediaType = "video"
-					}
-					media = append(media, &protomodel.MediaData{
-						Type:      mediaType,
-						Source:    m.MediaURI,
-						Thumbnail: m.MediaURI,
-					})
-				}
-			} else if r.ExternalContextURL != "" {
-				postType = "link"
-			} else if r.Post != "" {
-				postType = "update"
-			} else {
+		friends := make([]*protomodel.Tag, 0)
+		for _, t := range p.Tags {
+			friends = append(friends, &protomodel.Tag{
+				Id:   t.FriendID.String(),
+				Name: t.FriendName,
+			})
+		}
+
+		// Add post
+		post := &protomodel.Post{
+			Timestamp: p.Timestamp,
+			Type:      postType,
+			Post:      p.Post,
+			Id:        p.ID.String(),
+			MediaData: media,
+			Location:  l,
+			Url:       p.ExternalContextURL,
+			Title:     p.Title,
+			Tags:      friends,
+		}
+
+		// Make sure there is not duplicated post saved
+		if lastPostTimestamp != p.Timestamp {
+			postData, err := proto.Marshal(post)
+			if err != nil {
+				sentry.CaptureException(err)
 				continue
 			}
 
-			var l *protomodel.Location
-			if len(r.Place) > 0 {
-				firstPlace := r.Place[0]
-				lat, _ := strconv.ParseFloat(firstPlace.Latitude, 64)
-				long, _ := strconv.ParseFloat(firstPlace.Longitude, 64)
-				l = &protomodel.Location{
-					Address: firstPlace.Address,
-					Coordinate: &protomodel.Coordinate{
-						Latitude:  lat,
-						Longitude: long,
-					},
-					Name:      firstPlace.Name,
-					CreatedAt: r.Timestamp,
-				}
-
-				counter.lastLocation = l.GetCoordinate()
+			if err := saver.save(accountNumber+"/post", p.Timestamp, postData); err != nil {
+				logEntity.Error(err)
+				sentry.CaptureException(err)
+				return err
 			}
-
-			friends := make([]*protomodel.Tag, 0)
-			for _, f := range r.Tags {
-				friends = append(friends, &protomodel.Tag{
-					Id:   f.FriendID,
-					Name: f.Tags,
-				})
-			}
-
-			// Add post
-			post := &protomodel.Post{
-				Timestamp: r.Timestamp,
-				Type:      postType,
-				Post:      r.Post,
-				Id:        r.PostID,
-				MediaData: media,
-				Location:  l,
-				Url:       r.ExternalContextURL,
-				Title:     r.Title,
-				Tags:      friends,
-			}
-
-			if lastPostTimestamp != r.Timestamp {
-				postData, _ := proto.Marshal(post)
-				if err := saver.save(accountNumber+"/post", r.Timestamp, postData); err != nil {
-					logEntity.Error(err)
-					sentry.CaptureException(err)
-					continue
-				}
-				counter.countWeek(post)
-				counter.countYear(post)
-				counter.countDecade(post)
-				counter.LastPostTimestamp = r.Timestamp
-				lastPostTimestamp = r.Timestamp
-			}
-
-			if counter.earliestPostTimestamp > post.Timestamp {
-				counter.earliestPostTimestamp = post.Timestamp
-			}
-			if counter.latestPostTimestamp < post.Timestamp {
-				counter.latestPostTimestamp = post.Timestamp
-			}
-		}
-
-		// Should go to next page?
-		total := len(postRespData.Results)
-		if total == 0 {
-			break
-		} else {
-			currentOffset += total
+			counter.countWeek(post)
+			counter.countYear(post)
+			counter.countDecade(post)
+			counter.LastPostTimestamp = p.Timestamp
+			lastPostTimestamp = p.Timestamp
 		}
 	}
 
@@ -162,10 +152,7 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 	}
 
 	// Calculate original location
-	accountMetadata := map[string]interface{}{
-		"original_timestamp":        counter.earliestPostTimestamp,
-		"latest_activity_timestamp": counter.latestPostTimestamp,
-	}
+	accountMetadata := map[string]interface{}{}
 	if counter.lastLocation != nil {
 		logEntity.Info("Parsing location")
 		geoCodingData, err := b.geoServiceClient.ReverseGeocode(ctx,
@@ -188,7 +175,7 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 
 	logEntity.Info("Enqueue parsing reaction")
 	server.SendTask(&tasks.Signature{
-		Name: jobAnalyzeSentiments,
+		Name: jobAnalyzeReactions,
 		Args: []tasks.Arg{
 			{
 				Type:  "string",
@@ -200,6 +187,21 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 			},
 		},
 	})
+
+	// TODO: Figure out how to to sentiments for now
+	// server.SendTask(&tasks.Signature{
+	// 	Name: jobAnalyzeSentiments,
+	// 	Args: []tasks.Arg{
+	// 		{
+	// 			Type:  "string",
+	// 			Value: accountNumber,
+	// 		},
+	// 		{
+	// 			Type:  "int64",
+	// 			Value: archiveid,
+	// 		},
+	// 	},
+	// })
 
 	logEntity.Info("Finish...")
 
@@ -246,9 +248,7 @@ type postStatisticCounter struct {
 	lastTotalPostOfYear   int64
 	lastTotalPostOfDecade int64
 
-	lastLocation          *protomodel.Coordinate
-	earliestPostTimestamp int64
-	latestPostTimestamp   int64
+	lastLocation *protomodel.Coordinate
 }
 
 func plusOneValue(m *map[string]int64, key string) {
@@ -299,10 +299,8 @@ func newPostStatisticCounter() *postStatisticCounter {
 		Years:   make([]*protomodel.Usage, 0),
 		Decades: make([]*protomodel.Usage, 0),
 
-		lastLocation:          nil,
-		LastPostTimestamp:     time.Now().Unix(),
-		earliestPostTimestamp: time.Now().Unix(),
-		latestPostTimestamp:   0,
+		lastLocation:      nil,
+		LastPostTimestamp: time.Now().Unix(),
 	}
 }
 

@@ -28,8 +28,8 @@ CREATE TABLE fbm.account (
 
 CREATE TABLE fbm.token (
     id TEXT NOT NULL PRIMARY KEY,
-    account_number TEXT NOT NULL REFERENCES fbm.account(account_number),
-    info JSONB NOT NULL DEFAULT '{}'::json, 
+    account_number TEXT NOT NULL REFERENCES fbm.account(account_number) ON DELETE CASCADE,
+    info JSONB NOT NULL DEFAULT '{}'::json,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     expired_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -37,7 +37,7 @@ CREATE TABLE fbm.token (
 CREATE TYPE archive_status AS ENUM ('submitted', 'stored', 'processing', 'processed', 'invalid');
 CREATE TABLE fbm.fbarchive (
     id SERIAL PRIMARY KEY,
-    account_number TEXT NOT NULL REFERENCES fbm.account(account_number), 
+    account_number TEXT NOT NULL REFERENCES fbm.account(account_number) ON DELETE CASCADE,
     file_key TEXT NOT NULL,
     starting_time TIMESTAMP WITH TIME ZONE NOT NULL,
     ending_time TIMESTAMP WITH TIME ZONE DEFAULT now(),

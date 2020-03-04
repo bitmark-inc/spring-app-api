@@ -16,6 +16,9 @@ var (
 		1006: "account not found",
 		1007: "API for this client version has been discontinued",
 		1008: "account is being deleted",
+
+		2000: "file source is not supported",
+		2001: "invalid archive file",
 	}
 
 	errorInternalServer             = errorJSON(999)
@@ -28,6 +31,9 @@ var (
 	errorAccountNotFound            = errorJSON(1006)
 	errorUnsupportedClientVersion   = errorJSON(1007)
 	errorAccountDeleting            = errorJSON(1008)
+
+	errorFileSourceUnsupported = errorJSON(2000)
+	errorInvalidArchiveFile    = errorJSON(2001)
 )
 
 // errorJSON converts an error code to a standardized error object

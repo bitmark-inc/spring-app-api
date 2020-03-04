@@ -21,7 +21,7 @@ func UploadArchive(sess *session.Session, data io.Reader, accountNumber, filenam
 
 	s3key := fmt.Sprintf("%s/%s/archives/%d/%s", accountNumber, archiveType, archiveID, filename)
 
-	logEntity.Info("Start uploading to S3")
+	logEntity.WithField("key", s3key).Info("Start uploading to S3")
 	_, err := svc.Upload(&s3manager.UploadInput{
 		Bucket:   aws.String(viper.GetString("aws.s3.bucket")),
 		Key:      aws.String(s3key),

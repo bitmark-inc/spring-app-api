@@ -1,7 +1,6 @@
 package api
 
 import (
-	"archive/zip"
 	"bytes"
 	"encoding/hex"
 	"io"
@@ -16,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
@@ -43,33 +43,8 @@ func (s *Server) uploadArchive(c *gin.Context) {
 		return
 	}
 
-	switch http.DetectContentType(fileBytes) {
-	case "application/zip":
-		requiredDir := map[string]struct{}{
-			"photos_and_videos/": {},
-			"posts/":             {},
-			"friends/":           {},
-		}
-		z, err := zip.NewReader(bytes.NewReader(fileBytes), int64(len(fileBytes)))
-		if shouldInterupt(err, c) {
-			return
-		}
-
-		for _, f := range z.File {
-			if f.Mode().IsDir() {
-				if _, ok := requiredDir[f.Name]; ok {
-					delete(requiredDir, f.Name)
-				}
-			}
-		}
-
-		if len(requiredDir) != 0 {
-			abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-			return
-		}
-
-	default:
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+	if !facebook.IsValidArchiveFile(fileBytes) {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidArchiveFile)
 		return
 	}
 
@@ -77,6 +52,7 @@ func (s *Server) uploadArchive(c *gin.Context) {
 	teeReader := io.TeeReader(bytes.NewBuffer(fileBytes), h)
 
 	sess := session.New(s.awsConf)
+	// FIXME: hardcoded archived.zip
 	s3key, err := s3util.UploadArchive(sess, teeReader, account.AccountNumber, "archive.zip", params.ArchiveType, archiveRecord.ID, map[string]*string{
 		"archive_type": aws.String(params.ArchiveType),
 		"archive_id":   aws.String(strconv.FormatInt(archiveRecord.ID, 10)),
@@ -135,6 +111,7 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 	var params struct {
 		FileURL     string `json:"file_url"`
 		ArchiveType string `json:"archive_type"`
+		RawCookie   string `json:"raw_cookie"` // FIXME: this is for facebook automated downloading
 		StartedAt   int64  `json:"started_at"`
 		EndedAt     int64  `json:"ended_at"`
 	}
@@ -145,7 +122,14 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 		return
 	}
 
+	// FIXME: this is hardcoded for facebook automate downloading
+	archiveType := params.ArchiveType
+	if params.RawCookie != "" {
+		archiveType = "facebook"
+	}
+
 	account := c.MustGet("account").(*store.Account)
+
 	archiveRecord, err := s.store.AddFBArchive(c, account.AccountNumber, time.Unix(params.StartedAt, 0), time.Unix(params.EndedAt, 0))
 	shouldInterupt(err, c)
 
@@ -169,11 +153,11 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 			},
 			{
 				Type:  "string",
-				Value: params.ArchiveType,
+				Value: archiveType,
 			},
 			{
 				Type:  "string",
-				Value: "",
+				Value: params.RawCookie,
 			},
 			{
 				Type:  "string",

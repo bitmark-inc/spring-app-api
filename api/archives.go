@@ -1,21 +1,14 @@
 package api
 
 import (
-	"bytes"
-	"encoding/hex"
-	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/sha3"
 
-	"github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
@@ -24,6 +17,7 @@ import (
 func (s *Server) uploadArchive(c *gin.Context) {
 	var params struct {
 		ArchiveType string `form:"type" binding:"required"`
+		ArchiveSize int64  `form:"size" binding:"required"`
 	}
 
 	if err := c.BindQuery(&params); err != nil {
@@ -38,72 +32,26 @@ func (s *Server) uploadArchive(c *gin.Context) {
 		return
 	}
 
-	fileBytes, err := c.GetRawData()
-	if shouldInterupt(err, c) {
-		return
-	}
-
-	if !facebook.IsValidArchiveFile(fileBytes) {
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidArchiveFile)
-		return
-	}
-
-	h := sha3.New512()
-	teeReader := io.TeeReader(bytes.NewBuffer(fileBytes), h)
-
 	sess := session.New(s.awsConf)
-	// FIXME: hardcoded archived.zip
-	s3key, err := s3util.UploadArchive(sess, teeReader, account.AccountNumber, "archive.zip", params.ArchiveType, archiveRecord.ID, map[string]*string{
-		"archive_type": aws.String(params.ArchiveType),
-		"archive_id":   aws.String(strconv.FormatInt(archiveRecord.ID, 10)),
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
-		return
-	}
 
-	fingerprintBytes := h.Sum(nil)
-	fingerprint := hex.EncodeToString(fingerprintBytes)
-
-	_, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
-		ID: &archiveRecord.ID,
-	}, &store.FBArchiveQueryParam{
-		S3Key:       &s3key,
-		Status:      &store.FBArchiveStatusStored,
-		ContentHash: &fingerprint,
-	})
+	uploadInfo, err := s3util.NewArchiveUpload(sess, account.AccountNumber, params.ArchiveType, params.ArchiveSize, archiveRecord.ID)
 	if err != nil {
+		if _, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
+			ID: &archiveRecord.ID,
+		}, &store.FBArchiveQueryParam{
+			Status: &store.FBArchiveStatusInvalid,
+		}); err != nil {
+			log.Debug(err)
+			abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+			return
+		}
+
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
 		return
 	}
 
-	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
-		Name: "parse_archive",
-		Args: []tasks.Arg{
-			{
-				Type:  "string",
-				Value: params.ArchiveType,
-			},
-			{
-				Type:  "string",
-				Value: account.AccountNumber,
-			},
-			{
-				Type:  "int64",
-				Value: archiveRecord.ID,
-			},
-		},
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-	log.Info("Enqueued job with id:", job.Signature.UUID)
-
-	c.JSON(http.StatusAccepted, gin.H{"result": "ok"})
+	c.JSON(http.StatusOK, gin.H{"result": uploadInfo})
 }
 
 // uploadArchiveByURL allows users to upload data archives using a given url
@@ -130,17 +78,8 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 
 	account := c.MustGet("account").(*store.Account)
 
-	archiveRecord, err := s.store.AddFBArchive(c, account.AccountNumber, time.Unix(params.StartedAt, 0), time.Unix(params.EndedAt, 0))
-	shouldInterupt(err, c)
-
-	_, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
-		ID: &archiveRecord.ID,
-	}, &store.FBArchiveQueryParam{
-		Status: &store.FBArchiveStatusSubmitted,
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+	archiveRecord, err := s.store.AddFBArchive(c, account.AccountNumber, time.Unix(params.StartedAt, 0), time.Now())
+	if shouldInterupt(err, c) {
 		return
 	}
 
@@ -154,56 +93,6 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 			{
 				Type:  "string",
 				Value: archiveType,
-			},
-			{
-				Type:  "string",
-				Value: params.RawCookie,
-			},
-			{
-				Type:  "string",
-				Value: account.AccountNumber,
-			},
-			{
-				Type:  "int64",
-				Value: archiveRecord.ID,
-			},
-		},
-	})
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-	log.Info("Enqueued job with id:", job.Signature.UUID)
-
-	c.JSON(http.StatusAccepted, gin.H{"result": "ok"})
-}
-
-func (s *Server) downloadFBArchive(c *gin.Context) {
-	var params struct {
-		Headers   map[string]string `json:"headers"`
-		FileURL   string            `json:"file_url"`
-		RawCookie string            `json:"raw_cookie"`
-		StartedAt int64             `json:"started_at"`
-		EndedAt   int64             `json:"ended_at"`
-	}
-
-	if err := c.BindJSON(&params); err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
-		return
-	}
-
-	account := c.MustGet("account").(*store.Account)
-	archiveRecord, err := s.store.AddFBArchive(c, account.AccountNumber, time.Unix(params.StartedAt, 0), time.Unix(params.EndedAt, 0))
-	shouldInterupt(err, c)
-
-	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
-		Name: "download_archive",
-		Args: []tasks.Arg{
-			{
-				Type:  "string",
-				Value: params.FileURL,
 			},
 			{
 				Type:  "string",

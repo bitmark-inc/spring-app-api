@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,10 +18,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/bitmark-inc/spring-app-api/archives/facebook"
-	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -79,7 +79,7 @@ func downloadFromLink(ctx context.Context, httpClient *http.Client, link, rawCoo
 	if err != nil {
 		logEntity.Error(err)
 	}
-	logEntity.WithField("dump", string(reqDump)).Info("Request dump")
+	logEntity.WithField("dump", string(reqDump)).Debug("Request first download")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -107,7 +107,7 @@ func downloadFromLink(ctx context.Context, httpClient *http.Client, link, rawCoo
 					if err != nil {
 						logEntity.Error(err)
 					}
-					logEntity.WithField("dump", string(reqDump)).Info("Google large file request dump")
+					logEntity.WithField("dump", string(reqDump)).Debug("Request second download for Google Drive")
 					return httpClient.Do(req)
 				}
 			}
@@ -127,37 +127,54 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 	defer resp.Body.Close()
 
 	// Print out the response in console log
-	dumpBytes, err := httputil.DumpResponse(resp, false)
-	if err != nil {
-		logEntity.Error(err)
-	}
-	dump := string(dumpBytes)
-	logEntity.Info("response: ", dump)
 
 	if resp.StatusCode > 300 {
-		logEntity.Error("Request failed")
+		dumpBytes, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			logEntity.Error(err)
+		}
+		logEntity.WithField("dump", string(dumpBytes)).Error("Request failed")
 		sentry.CaptureException(errors.New("Request failed"))
 		return nil
+	} else {
+		dumpBytes, err := httputil.DumpResponse(resp, false)
+		if err != nil {
+			logEntity.Error(err)
+		}
+		logEntity.WithField("dump", string(dumpBytes)).Debug("Response for downloaded archive file")
 	}
 
-	fileBytes, err := ioutil.ReadAll(resp.Body)
+	tmpfile, err := ioutil.TempFile(viper.GetString("archive.workdir"), fmt.Sprintf("%s-background-download-", accountNumber))
 	if err != nil {
 		return err
 	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
 
-	if !facebook.IsValidArchiveFile(fileBytes) {
+	if _, err := io.Copy(tmpfile, resp.Body); err != nil {
+		return err
+	}
+
+	if err := tmpfile.Sync(); err != nil {
+		return err
+	}
+
+	if !facebook.IsValidArchiveFile(tmpfile.Name()) {
 		return fmt.Errorf("invalid archive file")
 	}
 
 	sess := session.New(b.awsConf)
 
 	logEntity.Info("Start uploading to S3")
+	if _, err := tmpfile.Seek(0, 0); err != nil {
+		logEntity.Error(err)
+		return err
+	}
 
 	h := sha3.New512()
-	teeReader := io.TeeReader(bytes.NewBuffer(fileBytes), h)
+	teeReader := io.TeeReader(tmpfile, h)
 
-	// FIXME: hardcoded archived.zip
-	s3key, err := s3util.UploadArchive(sess, teeReader, accountNumber, "archive.zip", archiveType, archiveid, map[string]*string{
+	s3key, err := s3util.UploadArchive(sess, teeReader, accountNumber, archiveType, archiveid, map[string]*string{
 		"url":          aws.String(fileURL),
 		"archive_type": aws.String(archiveType),
 		"archive_id":   aws.String(strconv.FormatInt(archiveid, 10)),

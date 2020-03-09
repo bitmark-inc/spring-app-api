@@ -167,7 +167,7 @@ func (s *Server) postsCountStats(c *gin.Context) {
 	allStatsRows, err := s.ormDB.Raw(`SELECT post_type, count(post_type) FROM (
 		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
 			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
-			         WHEN post is not null THEN 'update'
+			         WHEN post is not null AND post <> '' THEN 'update'
 			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE timestamp > ? AND timestamp < ?
 		) AS t GROUP BY post_type`, params.From.Unix(), params.To.Unix()).Rows()
 	if err != nil {
@@ -180,7 +180,7 @@ func (s *Server) postsCountStats(c *gin.Context) {
 	accountStatsRows, err := s.ormDB.Raw(`SELECT post_type, count(post_type) FROM (
 		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
 			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
-			         WHEN post is not null THEN 'update'
+			         WHEN post is not null AND post <> '' THEN 'update'
 			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE timestamp > ? AND timestamp < ? AND data_owner_id = ?
 		) AS t GROUP BY post_type;`, params.From.Unix(), params.To.Unix(), account.AccountNumber).Rows()
 	if err != nil {

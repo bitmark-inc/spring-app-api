@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -18,20 +17,7 @@ func (b *BackgroundContext) deleteUserData(ctx context.Context, accountNumber st
 
 	// Delete on postgres db
 	logEntity.Info("Remove postgres db")
-	if err := b.store.DeleteFBArchives(ctx, &store.FBArchiveQueryParam{
-		AccountNumber: &accountNumber,
-	}); err != nil {
-		logEntity.Error(err)
-		sentry.CaptureException(err)
-	}
 	if err := b.store.DeleteAccount(ctx, accountNumber); err != nil {
-		logEntity.Error(err)
-		sentry.CaptureException(err)
-	}
-
-	// Delete parser's data_owner
-	logEntity.Info("Remove data owner on bitsocial")
-	if err := b.bitSocialClient.DeleteDataOwner(ctx, accountNumber); err != nil {
 		logEntity.Error(err)
 		sentry.CaptureException(err)
 	}
@@ -92,7 +78,7 @@ func (b *BackgroundContext) deleteUserData(ctx context.Context, accountNumber st
 
 	iter := s3manager.NewDeleteListIterator(svc, &s3.ListObjectsInput{
 		Bucket: aws.String(viper.GetString("aws.s3.bucket")),
-		Prefix: aws.String("archives/" + accountNumber + "/"),
+		Prefix: aws.String(accountNumber + "/"),
 	})
 
 	if err := s3manager.NewBatchDeleteWithClient(svc).Delete(ctx, iter); err != nil {

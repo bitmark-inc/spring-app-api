@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
@@ -17,8 +18,10 @@ func (b *BackgroundContext) extractTimeMetadata(ctx context.Context, accountNumb
 
 	// Get last post and reaction time.
 	var lastPost facebook.PostORM
-	if err := b.ormDB.Order("timestamp DESC").First(&lastPost).Error; err != nil {
-		return err
+	if err := b.ormDB.Where("data_owner_id = ?", accountNumber).Order("timestamp DESC").First(&lastPost).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
 	}
 
 	if lastPost.Timestamp > 0 {
@@ -26,8 +29,10 @@ func (b *BackgroundContext) extractTimeMetadata(ctx context.Context, accountNumb
 	}
 
 	var lastReaction facebook.ReactionORM
-	if err := b.ormDB.Order("timestamp DESC").First(&lastReaction).Error; err != nil {
-		return err
+	if err := b.ormDB.Where("data_owner_id = ?", accountNumber).Order("timestamp DESC").First(&lastReaction).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
 	}
 
 	if lastReaction.Timestamp > 0 {

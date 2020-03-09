@@ -40,6 +40,9 @@ type Store interface {
 	// GetFBArchives to fetch all fb archives
 	GetFBArchives(ctx context.Context, params *FBArchiveQueryParam) ([]FBArchive, error)
 
+	// InvalidFBArchives will set a fbarchive into invalid with an error message
+	InvalidFBArchive(ctx context.Context, params *FBArchiveQueryParam) error
+
 	// DeleteFBArchives to delete fbarchives with conditions
 	DeleteFBArchives(ctx context.Context, params *FBArchiveQueryParam) error
 
@@ -60,14 +63,22 @@ type FBArchiveQueryParam struct {
 	AccountNumber *string
 	S3Key         *string
 	Status        *string
+	Error         interface{}
 	AnalyzedID    *string
 	ContentHash   *string
+}
+
+func ArchiveMessage(message string) *string {
+	return &message
 }
 
 var (
 	// FB archive statuses:
 
-	// FBArchiveStatusSubmitted when an archive is submitted from clients
+	// FBArchiveStatusCreated when an archive is created
+	FBArchiveStatusCreated = "created"
+
+	// FBArchiveStatusSubmitted when an archive is submitted into cloud storage
 	FBArchiveStatusSubmitted = "submitted"
 
 	// FBArchiveStatusStored when an archive is successfully

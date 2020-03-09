@@ -8,19 +8,21 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/background/parser"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
 
 // parseArchive parse archive data based on its type
 func (b *BackgroundContext) parseArchive(ctx context.Context, archiveType, accountNumber string, archiveID int64) error {
+	jobError := NewArchiveJobError(archiveID, facebook.ErrFailToParseArchive)
 	if _, err := b.store.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
 		ID: &archiveID,
 	}, &store.FBArchiveQueryParam{
 		Status: &store.FBArchiveStatusProcessing,
 	}); err != nil {
 		log.Error(err)
-		return err
+		return jobError(err)
 	}
 
 	switch archiveType {
@@ -29,7 +31,7 @@ func (b *BackgroundContext) parseArchive(ctx context.Context, archiveType, accou
 			accountNumber, viper.GetString("archive.workdir"),
 			viper.GetString("aws.s3.bucket"),
 			strconv.FormatInt(archiveID, 10)); err != nil {
-			return err
+			return jobError(err)
 		}
 	}
 
@@ -49,7 +51,7 @@ func (b *BackgroundContext) parseArchive(ctx context.Context, archiveType, accou
 
 	if err != nil {
 		log.Debug(err)
-		return err
+		return jobError(err)
 	}
 
 	return nil

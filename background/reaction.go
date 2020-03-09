@@ -5,16 +5,19 @@ import (
 	"strconv"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/getsentry/sentry-go"
+	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
+
+	fbArchive "github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/timeutil"
-	"github.com/getsentry/sentry-go"
-	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 )
 
-func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber string, archiveid int64) error {
+func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber string, archiveID int64) error {
+	jobError := NewArchiveJobError(archiveID, fbArchive.ErrFailToExtractReaction)
 	logEntry := log.WithField("prefix", "extract_reaction")
 
 	saver := newStatSaver(b.fbDataStore)
@@ -43,25 +46,25 @@ func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber s
 		if err := saver.save(accountNumber+"/reaction", reaction.Timestamp, reactionData); err != nil {
 			logEntry.Error(err)
 			sentry.CaptureException(err)
-			return err
+			return jobError(err)
 		}
 
 		if err := counter.count(reaction); err != nil {
 			logEntry.Error(err)
 			sentry.CaptureException(err)
-			return err
+			return jobError(err)
 		}
 	}
 
 	if err := counter.flush(); err != nil {
 		logEntry.Error(err)
 		sentry.CaptureException(err)
-		return err
+		return jobError(err)
 	}
 	if err := saver.flush(); err != nil {
 		logEntry.Error(err)
 		sentry.CaptureException(err)
-		return err
+		return jobError(err)
 	}
 
 	logEntry.Info("Enqueue parsing time meta")
@@ -88,12 +91,12 @@ func (b *BackgroundContext) extractReaction(ctx context.Context, accountNumber s
 
 	// Mark the archive is processed
 	if _, err := b.store.UpdateFBArchiveStatus(ctx, &store.FBArchiveQueryParam{
-		ID: &archiveid,
+		ID: &archiveID,
 	}, &store.FBArchiveQueryParam{
 		Status: &store.FBArchiveStatusProcessed,
 	}); err != nil {
 		logEntry.Error(err)
-		return err
+		return jobError(err)
 	}
 
 	logEntry.Info("Finish parsing reactions")

@@ -34,7 +34,7 @@ CREATE TABLE fbm.token (
     expired_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
-CREATE TYPE archive_status AS ENUM ('submitted', 'stored', 'processing', 'processed', 'invalid');
+CREATE TYPE archive_status AS ENUM ('created', 'submitted', 'stored', 'processing', 'processed', 'invalid');
 CREATE TABLE fbm.fbarchive (
     id SERIAL PRIMARY KEY,
     account_number TEXT NOT NULL REFERENCES fbm.account(account_number) ON DELETE CASCADE,
@@ -43,7 +43,8 @@ CREATE TABLE fbm.fbarchive (
     ending_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
     analyzed_task_id TEXT DEFAULT '',
     content_hash TEXT DEFAULT '',
-    processing_status archive_status DEFAULT 'submitted',
+    processing_status archive_status DEFAULT 'created',
+    processing_error JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );

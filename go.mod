@@ -6,6 +6,7 @@ require (
 	github.com/Masterminds/squirrel v1.1.0
 	github.com/RichardKnop/machinery v1.7.3
 	github.com/alecthomas/jsonschema v0.0.0-20200210115347-d65fe469b048
+	github.com/aws/aws-lambda-go v1.15.0
 	github.com/aws/aws-sdk-go v1.28.14
 	github.com/bitmark-inc/bitmark-sdk-go v0.2.1
 	github.com/bitmark-inc/datapod/data-parser v0.0.0-20200226020639-2733bb02fe5f

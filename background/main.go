@@ -20,14 +20,6 @@ import (
 	machinerylog "github.com/RichardKnop/machinery/v1/log"
 	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
-	bitmarksdk "github.com/bitmark-inc/bitmark-sdk-go"
-	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
-	"github.com/bitmark-inc/spring-app-api/external/geoservice"
-	"github.com/bitmark-inc/spring-app-api/external/onesignal"
-	"github.com/bitmark-inc/spring-app-api/logmodule"
-	"github.com/bitmark-inc/spring-app-api/store"
-	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
-	"github.com/bitmark-inc/spring-app-api/store/postgres"
 	"github.com/getsentry/sentry-go"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -36,6 +28,15 @@ import (
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/sync/errgroup"
+
+	bitmarksdk "github.com/bitmark-inc/bitmark-sdk-go"
+	"github.com/bitmark-inc/spring-app-api/external/fbarchive"
+	"github.com/bitmark-inc/spring-app-api/external/geoservice"
+	"github.com/bitmark-inc/spring-app-api/external/onesignal"
+	"github.com/bitmark-inc/spring-app-api/logmodule"
+	"github.com/bitmark-inc/spring-app-api/store"
+	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
+	"github.com/bitmark-inc/spring-app-api/store/postgres"
 )
 
 var (
@@ -116,6 +117,37 @@ func loadConfig(file string) {
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("fbm")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+}
+
+// CodeError defines a interface of error tha includes an error code in string
+type CodeError interface {
+	Code() string
+	Error() string
+}
+
+// ArchiveJobError is an error for machinery that helps determine further error handling
+// in the callback function. ArchiveJobError includes an archive ID so that we can set the
+// error to corresponded its archive in DB
+type ArchiveJobError struct {
+	ID        int64
+	CodeError CodeError
+	JobError  error
+}
+
+func NewArchiveJobError(id int64, codeError CodeError) func(err error) error {
+	a := &ArchiveJobError{
+		ID:        id,
+		CodeError: codeError,
+	}
+
+	return func(err error) error {
+		a.JobError = err
+		return a
+	}
+}
+
+func (a *ArchiveJobError) Error() string {
+	return fmt.Sprintf("%s(%s) archive_id: %d", a.CodeError.Code(), a.JobError.Error(), a.ID)
 }
 
 func main() {
@@ -236,14 +268,14 @@ func main() {
 		log.Fatal(err)
 	}
 	worker := server.NewWorker(workerName, viper.GetInt("worker.concurrency"))
-	if err := worker.Launch(); err != nil {
-		log.Fatal(err)
-	}
-
 	// Map the name of jobs to handler functions
 	worker.SetPreTaskHandler(b.jobStartCollectiveMetric)
 	worker.SetPostTaskHandler(b.jobEndCollectiveMetric)
 	worker.SetErrorHandler(b.jobErrorHandler)
+
+	if err := worker.Launch(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Start processing jobs
 
@@ -308,6 +340,17 @@ func (b *BackgroundContext) jobEndCollectiveMetric(signature *tasks.Signature) {
 }
 
 func (b *BackgroundContext) jobErrorHandler(err error) {
+	switch err := err.(type) {
+	case *ArchiveJobError:
+		archiveID := err.ID
+		if err := b.store.InvalidFBArchive(context.Background(), &store.FBArchiveQueryParam{
+			ID:    &archiveID,
+			Error: &err.CodeError,
+		}); err != nil {
+			log.WithField("prefix", "job_error").WithField("archvie_id", archiveID).WithField("action", "InvalidFBArchive").Warn(err.Error())
+		}
+	}
+
 	log.Error(err)
 	sentry.CaptureException(err)
 }

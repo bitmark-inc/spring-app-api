@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -109,7 +111,8 @@ func (p *PGStore) UpdateFBArchiveStatus(ctx context.Context, params *store.FBArc
 }
 
 func (p *PGStore) GetFBArchives(ctx context.Context, params *store.FBArchiveQueryParam) ([]store.FBArchive, error) {
-	q := psql.Select("id, account_number, file_key, starting_time, ending_time, analyzed_task_id, content_hash, processing_status, created_at, updated_at").
+	q := psql.Select(`id, account_number, file_key, starting_time, ending_time, analyzed_task_id,
+					  content_hash, processing_status, processing_error, created_at, updated_at`).
 		From("fbm.fbarchive")
 
 	if params.ID != nil {
@@ -148,6 +151,7 @@ func (p *PGStore) GetFBArchives(ctx context.Context, params *store.FBArchiveQuer
 			&fbArchive.AnalyzedTaskID,
 			&fbArchive.ContentHash,
 			&fbArchive.ProcessingStatus,
+			&fbArchive.ProcessingError,
 			&fbArchive.CreatedAt,
 			&fbArchive.UpdatedAt); err != nil {
 			return nil, err
@@ -157,6 +161,33 @@ func (p *PGStore) GetFBArchives(ctx context.Context, params *store.FBArchiveQuer
 	}
 
 	return fbarchives, nil
+}
+
+func (p *PGStore) InvalidFBArchive(ctx context.Context, params *store.FBArchiveQueryParam) error {
+
+	if params.ID == nil {
+		return fmt.Errorf("archive id is required to invalid a archive")
+	}
+
+	if params.Error == nil {
+		return fmt.Errorf("message is required to invalid a archive")
+	}
+
+	b, err := json.Marshal(params.Error)
+	if err != nil {
+		return err
+	}
+
+	q := psql.Update("fbm.fbarchive").
+		Set("updated_at", time.Now()).
+		Set("processing_status", &store.FBArchiveStatusInvalid).
+		Set("processing_error", b).
+		Where(sq.Eq{"id": *params.ID})
+
+	st, val, _ := q.ToSql()
+
+	_, err = p.pool.Exec(ctx, st, val...)
+	return err
 }
 
 func (p *PGStore) DeleteFBArchives(ctx context.Context, params *store.FBArchiveQueryParam) error {

@@ -10,13 +10,15 @@ import (
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 
+	fbArchive "github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/protomodel"
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/timeutil"
 )
 
-func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber string, archiveid int64) error {
+func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber string, archiveID int64) error {
+	jobError := NewArchiveJobError(archiveID, fbArchive.ErrFailToExtractPost)
 	logEntity := log.WithField("prefix", "extract_post")
 	counter := newPostStatisticCounter()
 
@@ -26,11 +28,13 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 
 	// Fetch posts from db
 	posts := make([]facebook.PostORM, 0)
-	b.ormDB.Preload("MediaItems").
+	if err := b.ormDB.Preload("MediaItems").
 		Preload("Places").
 		Preload("Tags").
 		Where(&facebook.PostORM{DataOwnerID: accountNumber}).
-		Order("timestamp ASC").Find(&posts)
+		Order("timestamp ASC").Find(&posts).Error; err != nil {
+		return jobError(err)
+	}
 
 	// Save to dynamodb
 	for _, p := range posts {
@@ -108,7 +112,7 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 			if err := saver.save(accountNumber+"/post", p.Timestamp, postData); err != nil {
 				logEntity.Error(err)
 				sentry.CaptureException(err)
-				return err
+				return jobError(err)
 			}
 			counter.countWeek(post)
 			counter.countYear(post)
@@ -159,7 +163,7 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 			counter.lastLocation.Latitude,
 			counter.lastLocation.Longitude)
 		if err != nil {
-			return err
+			return jobError(err)
 		}
 
 		accountMetadata["original_location"] = geoCodingData.Address.CountryCode
@@ -170,11 +174,11 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 	if _, err := b.store.UpdateAccountMetadata(ctx, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	}, accountMetadata); err != nil {
-		return err
+		return jobError(err)
 	}
 
 	logEntity.Info("Enqueue parsing reaction")
-	server.SendTask(&tasks.Signature{
+	_, err := server.SendTask(&tasks.Signature{
 		Name: jobAnalyzeReactions,
 		Args: []tasks.Arg{
 			{
@@ -183,25 +187,13 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 			},
 			{
 				Type:  "int64",
-				Value: archiveid,
+				Value: archiveID,
 			},
 		},
 	})
-
-	// TODO: Figure out how to to sentiments for now
-	// server.SendTask(&tasks.Signature{
-	// 	Name: jobAnalyzeSentiments,
-	// 	Args: []tasks.Arg{
-	// 		{
-	// 			Type:  "string",
-	// 			Value: accountNumber,
-	// 		},
-	// 		{
-	// 			Type:  "int64",
-	// 			Value: archiveid,
-	// 		},
-	// 	},
-	// })
+	if err != nil {
+		return jobError(err)
+	}
 
 	logEntity.Info("Finish...")
 

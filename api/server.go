@@ -229,6 +229,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	secretRoute.Use(logmodule.Ginrus("Secret"))
 	secretRoute.Use(s.apikeyAuthentication(viper.GetString("server.apikey.admin")))
 	{
+		secretRoute.POST("/ack-archive-uploaded", s.adminAckArchiveUploaded)
 		secretRoute.POST("/submit-archives", s.adminSubmitArchives)
 		secretRoute.POST("/parse-archives", s.adminForceParseArchive)
 		secretRoute.POST("/generate-hash-content", s.adminGenerateHashContent)

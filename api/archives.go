@@ -1,7 +1,10 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
@@ -9,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/bitmark-inc/spring-app-api/archives/facebook"
 	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
@@ -36,17 +40,16 @@ func (s *Server) uploadArchive(c *gin.Context) {
 
 	uploadInfo, err := s3util.NewArchiveUpload(sess, account.AccountNumber, params.ArchiveType, params.ArchiveSize, archiveRecord.ID)
 	if err != nil {
-		if _, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
-			ID: &archiveRecord.ID,
-		}, &store.FBArchiveQueryParam{
-			Status: &store.FBArchiveStatusInvalid,
+		if err := s.store.InvalidFBArchive(c, &store.FBArchiveQueryParam{
+			ID:    &archiveRecord.ID,
+			Error: &facebook.ErrFailToCreateArchive,
 		}); err != nil {
-			log.Debug(err)
+			log.WithField("archvie_id", archiveRecord.ID).WithField("action", "InvalidFBArchive").Warn(err.Error())
 			abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
 			return
 		}
 
-		log.Debug(err)
+		log.WithError(err).Debug("fail to create a upload link")
 		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
 		return
 	}
@@ -83,6 +86,15 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 		return
 	}
 
+	_, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
+		ID: &archiveRecord.ID,
+	}, &store.FBArchiveQueryParam{
+		Status: &store.FBArchiveStatusSubmitted,
+	})
+	if shouldInterupt(err, c) {
+		return
+	}
+
 	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
 		Name: "download_archive",
 		Args: []tasks.Arg{
@@ -110,7 +122,7 @@ func (s *Server) uploadArchiveByURL(c *gin.Context) {
 	})
 	if err != nil {
 		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
 		return
 	}
 	log.Info("Enqueued job with id:", job.Signature.UUID)
@@ -132,6 +144,93 @@ func (s *Server) getAllArchives(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"result": archives,
 	})
+}
+
+// uploadArchive allows users to upload data archives
+func (s *Server) adminAckArchiveUploaded(c *gin.Context) {
+	var params struct {
+		FileKey  string `json:"file_key"`
+		FileHash string `json:"file_hash"`
+	}
+
+	if err := c.BindJSON(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	keys := strings.Split(params.FileKey, "/")
+	if len(keys) < 5 || keys[4] != "archive.zip" {
+		log.Debug(fmt.Errorf("invalid archive file key"))
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+		return
+	}
+	// %s/%s/archives/%d/%s, accountNumber, archiveType, archiveID, "archive.zip"
+
+	archiveID, err := strconv.ParseInt(keys[3], 10, 64)
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+		return
+	}
+
+	_, err = s.store.UpdateFBArchiveStatus(c, &store.FBArchiveQueryParam{
+		ID: &archiveID,
+	}, &store.FBArchiveQueryParam{
+		S3Key:       &params.FileKey,
+		Status:      &store.FBArchiveStatusSubmitted,
+		ContentHash: &params.FileHash, //  FIXME: calculate later
+	})
+
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+		return
+	}
+
+	// FIXME: this cause additional download the archive file
+	if _, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+		Name: "generate_hash_content",
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: params.FileKey,
+			},
+			{
+				Type:  "int64",
+				Value: archiveID,
+			},
+		},
+	}); err != nil {
+		panic(err)
+	}
+
+	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+		Name: "parse_archive",
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: keys[1],
+			},
+			{
+				Type:  "string",
+				Value: keys[0],
+			},
+			{
+				Type:  "int64",
+				Value: archiveID,
+			},
+		},
+	})
+
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
+		return
+	}
+	log.Info("Enqueued job with id:", job.Signature.UUID)
+
+	c.JSON(http.StatusOK, gin.H{"result": ""})
 }
 
 func (s *Server) adminSubmitArchives(c *gin.Context) {

@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/bitmark-inc/spring-app-api/archives/facebook"
+	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/getsentry/sentry-go"
 	log "github.com/sirupsen/logrus"
@@ -117,12 +118,13 @@ func downloadFromLink(ctx context.Context, httpClient *http.Client, link, rawCoo
 }
 
 func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiveType, rawCookie, accountNumber string, archiveid int64) error {
+	jobError := NewArchiveJobError(archiveid, facebook.ErrFailToDownloadArchive)
 	logEntity := log.WithField("prefix", "download_archive")
 
 	resp, err := downloadFromLink(ctx, b.httpClient, fileURL, rawCookie)
 	if err != nil {
 		logEntity.Error(err)
-		return err
+		return jobError(err)
 	}
 	defer resp.Body.Close()
 
@@ -146,21 +148,21 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 
 	tmpfile, err := ioutil.TempFile(viper.GetString("archive.workdir"), fmt.Sprintf("%s-background-download-", accountNumber))
 	if err != nil {
-		return err
+		return jobError(err)
 	}
 	defer os.Remove(tmpfile.Name())
 	defer tmpfile.Close()
 
 	if _, err := io.Copy(tmpfile, resp.Body); err != nil {
-		return err
+		return jobError(err)
 	}
 
 	if err := tmpfile.Sync(); err != nil {
-		return err
+		return jobError(err)
 	}
 
 	if !facebook.IsValidArchiveFile(tmpfile.Name()) {
-		return fmt.Errorf("invalid archive file")
+		return jobError(fmt.Errorf("invalid archive file"))
 	}
 
 	sess := session.New(b.awsConf)
@@ -168,7 +170,7 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 	logEntity.Info("Start uploading to S3")
 	if _, err := tmpfile.Seek(0, 0); err != nil {
 		logEntity.Error(err)
-		return err
+		return jobError(err)
 	}
 
 	h := sha3.New512()
@@ -182,7 +184,7 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 
 	if err != nil {
 		logEntity.Error(err)
-		return err
+		return jobError(err)
 	}
 
 	// Get fingerprint
@@ -193,12 +195,12 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 		ID: &archiveid,
 	}, &store.FBArchiveQueryParam{
 		S3Key:       &s3key,
-		Status:      &store.FBArchiveStatusStored,
+		Status:      &store.FBArchiveStatusSubmitted,
 		ContentHash: &fingerprint,
 	})
 	if err != nil {
 		logEntity.Error(err)
-		return err
+		return jobError(err)
 	}
 
 	server.SendTask(&tasks.Signature{

@@ -13,6 +13,7 @@ type ArchiveORM struct {
 	AccountNumber    string
 	FileKey          string
 	ProcessingStatus string
+	ProcessingError  map[string]interface{}
 }
 
 func (ArchiveORM) TableName() string {

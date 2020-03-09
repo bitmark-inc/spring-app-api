@@ -6,14 +6,16 @@ import (
 	"path/filepath"
 
 	"github.com/bitmark-inc/datapod/data-parser/storage"
-	"github.com/bitmark-inc/spring-app-api/schema/facebook"
-	"github.com/bitmark-inc/spring-app-api/schema/spring"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	gormbulk "github.com/t-tiger/gorm-bulk-insert"
+
+	fbutil "github.com/bitmark-inc/spring-app-api/archives/facebook"
+	"github.com/bitmark-inc/spring-app-api/schema/facebook"
+	"github.com/bitmark-inc/spring-app-api/schema/spring"
 )
 
 var patterns = []facebook.Pattern{
@@ -65,6 +67,10 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 		return err
 	}
 	contextLogger.Info("archive downloaded")
+
+	if !fbutil.IsValidArchiveFile(localArchivePath) {
+		return fmt.Errorf("invalid archive file")
+	}
 
 	for _, pattern := range patterns {
 		contextLogger.WithField("type", pattern.Name).Info("parsing and inserting records into db")

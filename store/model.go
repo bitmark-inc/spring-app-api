@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -24,16 +25,17 @@ type Token struct {
 
 // FBArchive represents a fb archive information
 type FBArchive struct {
-	ID               int64     `json:"id"`
-	AccountNumber    string    `json:"-"`
-	S3Key            string    `json:"-"`
-	StartingTime     time.Time `json:"started_at"`
-	EndingTime       time.Time `json:"ended_at"`
-	ProcessingStatus string    `json:"status"`
-	AnalyzedTaskID   string    `json:"analyzed_task_id,omitempty"`
-	ContentHash      string    `json:"content_hash,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               int64           `json:"id"`
+	AccountNumber    string          `json:"-"`
+	S3Key            string          `json:"-"`
+	StartingTime     time.Time       `json:"started_at"`
+	EndingTime       time.Time       `json:"ended_at"`
+	ProcessingStatus string          `json:"status"`
+	ProcessingError  json.RawMessage `json:"error"`
+	AnalyzedTaskID   string          `json:"analyzed_task_id,omitempty"`
+	ContentHash      string          `json:"content_hash,omitempty"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 // FbData represent a statistic record for Facebook data that will be push to dynamodb

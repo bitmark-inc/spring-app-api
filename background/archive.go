@@ -190,7 +190,7 @@ func (b *BackgroundContext) generateHashContent(ctx context.Context, s3key strin
 	downloader := s3manager.NewDownloader(sess)
 	h := sha3.New512()
 
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "fbarchives-*.zip")
+	tmpFile, err := ioutil.TempFile(viper.GetString("archive.workdir"), "fbarchives-*.zip")
 	if err != nil {
 		logEntity.Error(err)
 		return err

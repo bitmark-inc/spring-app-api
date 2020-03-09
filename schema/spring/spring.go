@@ -1,5 +1,7 @@
 package spring
 
+import "encoding/json"
+
 type AccountORM struct {
 	AccountNumber string `gorm:"primary_key"`
 }
@@ -13,7 +15,7 @@ type ArchiveORM struct {
 	AccountNumber    string
 	FileKey          string
 	ProcessingStatus string
-	ProcessingError  map[string]interface{}
+	ProcessingError  json.RawMessage
 }
 
 func (ArchiveORM) TableName() string {

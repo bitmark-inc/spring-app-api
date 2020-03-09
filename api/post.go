@@ -168,11 +168,11 @@ func (s *Server) postsCountStats(c *gin.Context) {
 		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
 			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
 			         WHEN post is not null THEN 'update'
-			  	     ELSE 'undefined' END) AS post_type FROM facebook_post
-		) AS t GROUP BY post_type`).Rows()
+			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE timestamp > ? AND timestamp < ?
+		) AS t GROUP BY post_type`, params.From.Unix(), params.To.Unix()).Rows()
 	if err != nil {
 		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		abortWithEncoding(c, http.StatusBadRequest, errorInternalServer)
 		return
 	}
 	defer allStatsRows.Close()
@@ -181,8 +181,8 @@ func (s *Server) postsCountStats(c *gin.Context) {
 		SELECT (CASE WHEN media_attached IS TRUE THEN 'media'
 			  		 WHEN (external_context_url IS NOT NULL AND external_context_url <> '') THEN 'link'
 			         WHEN post is not null THEN 'update'
-			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE data_owner_id = ?
-		) AS t GROUP BY post_type;`, account.AccountNumber).Rows()
+			  	     ELSE 'undefined' END) AS post_type FROM facebook_post WHERE timestamp > ? AND timestamp < ? AND data_owner_id = ?
+		) AS t GROUP BY post_type;`, params.From.Unix(), params.To.Unix(), account.AccountNumber).Rows()
 	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)

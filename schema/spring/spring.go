@@ -4,6 +4,7 @@ import "encoding/json"
 
 type AccountORM struct {
 	AccountNumber string `gorm:"primary_key"`
+	Metadata      json.RawMessage
 }
 
 func (AccountORM) TableName() string {

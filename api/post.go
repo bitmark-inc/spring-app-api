@@ -253,7 +253,8 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 	account := c.MustGet("account").(*store.Account)
 
 	allStatsRows, err := s.ormDB.Raw(`SELECT reaction, count(reaction)
-		FROM facebook_reaction GROUP BY reaction`).Rows()
+		FROM facebook_reaction WHERE timestamp > ? AND timestamp < ?
+		GROUP BY reaction`, params.From.Unix(), params.To.Unix()).Rows()
 	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
@@ -262,8 +263,8 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 	defer allStatsRows.Close()
 
 	accountStatsRows, err := s.ormDB.Raw(`SELECT reaction, count(reaction)
-		FROM facebook_reaction
-		WHERE data_owner_id = ? GROUP BY reaction`, account.AccountNumber).Rows()
+		FROM facebook_reaction WHERE timestamp > ? AND timestamp < ? AND data_owner_id = ?
+		GROUP BY reaction`, params.From.Unix(), params.To.Unix(), account.AccountNumber).Rows()
 	if err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)

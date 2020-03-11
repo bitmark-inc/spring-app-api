@@ -38,6 +38,27 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 		return err
 	}
 
+	var account spring.AccountORM
+	if err := db.Model(spring.AccountORM{}).Where("account_number = ?", accountNumber).First(&account).Error; err != nil {
+		sentry.CaptureException(err)
+		return err
+	}
+
+	var metadata struct {
+		FirstActivityTimestamp int64 `json:"first_activity_timestamp"`
+		LastActivityTimestamp  int64 `json:"last_activity_timestamp"`
+	}
+
+	if err := json.Unmarshal(account.Metadata, &metadata); err != nil {
+		sentry.CaptureException(err)
+		return err
+	}
+
+	contextLogger.
+		WithField("firstActivityTimestamp", metadata.FirstActivityTimestamp).
+		WithField("lastActivityTimestamp", metadata.LastActivityTimestamp).
+		Info("account metadata")
+
 	// the layout of the local dir for this task:
 	// <data-owner> / facebook /
 	//   archives/
@@ -119,7 +140,8 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 				case "posts":
 					rawPosts := facebook.RawPosts{Items: make([]*facebook.RawPost, 0)}
 					json.Unmarshal(data, &rawPosts.Items)
-					posts, complexPosts := rawPosts.ORM(dataOwner, fmt.Sprint(archive.ID))
+					posts, complexPosts := rawPosts.ORM(dataOwner, fmt.Sprint(archive.ID),
+						metadata.FirstActivityTimestamp, metadata.LastActivityTimestamp)
 					if err := gormbulk.BulkInsert(db, posts, 1000); err != nil {
 						sentry.CaptureException(err)
 						continue

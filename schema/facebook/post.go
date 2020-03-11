@@ -14,7 +14,7 @@ import (
 type PostORM struct {
 	ID                    uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
 	PostID                int64
-	Timestamp             int64
+	Timestamp             int64 `gorm:"unique_index:facebook_post_owner_timestamp_unique"`
 	UpdateTimestamp       int64
 	Date                  string
 	Weekday               int
@@ -28,10 +28,11 @@ type PostORM struct {
 	EventEndTimestamp     int64
 	MediaAttached         bool
 	Sentiment             string
-	DataOwnerID           string
+	DataOwnerID           string         `gorm:"unique_index:facebook_post_owner_timestamp_unique"`
 	MediaItems            []PostMediaORM `gorm:"foreignkey:PostID;association_foreignkey:ID"`
 	Places                []PlaceORM     `gorm:"foreignkey:PostID;association_foreignkey:ID"`
 	Tags                  []TagORM       `gorm:"foreignkey:PostID;association_foreignkey:ID"`
+	ConflictFlag          bool
 }
 
 func (PostORM) TableName() string {
@@ -48,11 +49,12 @@ func (p *PostORM) BeforeCreate(scope *gorm.Scope) error {
 
 type PostMediaORM struct {
 	ID                uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	MediaURI          string
+	MediaURI          string    `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
 	FilenameExtension string
-	DataOwnerID       string
+	DataOwnerID       string  `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
 	Post              PostORM `gorm:"foreignkey:PostID"`
 	PostID            uuid.UUID
+	ConflictFlag      bool
 }
 
 func (PostMediaORM) TableName() string {
@@ -60,14 +62,15 @@ func (PostMediaORM) TableName() string {
 }
 
 type PlaceORM struct {
-	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	Name        string
-	Address     string
-	Latitude    float64
-	Longitude   float64
-	DataOwnerID string
-	Post        PostORM `gorm:"foreignkey:PostID"`
-	PostID      uuid.UUID
+	ID           uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
+	Name         string
+	Address      string
+	Latitude     float64
+	Longitude    float64
+	DataOwnerID  string    `gorm:"unique_index:facebook_place_owner_timestamp_unique"`
+	Post         PostORM   `gorm:"foreignkey:PostID"`
+	PostID       uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE: once post one place
+	ConflictFlag bool
 }
 
 func (PlaceORM) TableName() string {
@@ -75,13 +78,14 @@ func (PlaceORM) TableName() string {
 }
 
 type TagORM struct {
-	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	DataOwnerID string
-	Post        PostORM `gorm:"foreignkey:PostID"`
-	PostID      uuid.UUID
-	Friend      FriendORM `gorm:"foreignkey:FriendID"`
-	FriendID    uuid.UUID
-	FriendName  string
+	ID           uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
+	DataOwnerID  string    `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	Post         PostORM   `gorm:"foreignkey:PostID"`
+	PostID       uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	Friend       FriendORM `gorm:"foreignkey:FriendID"`
+	FriendID     uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	FriendName   string
+	ConflictFlag bool
 }
 
 func (TagORM) TableName() string {
@@ -92,12 +96,16 @@ type RawPosts struct {
 	Items []*RawPost
 }
 
-func (r *RawPosts) ORM(dataOwner, archiveID string) ([]interface{}, []PostORM) {
+func (r *RawPosts) ORM(dataOwner, archiveID string, beginTime, endTime int64) ([]interface{}, []PostORM) {
 	posts := make([]interface{}, 0)
 	complexPosts := make([]PostORM, 0)
 
 	for _, rp := range r.Items {
-		ts := time.Unix(int64(rp.Timestamp), 0)
+		t := int64(rp.Timestamp)
+		if t >= beginTime && t <= endTime { // omit post within current activity range
+			continue
+		}
+		ts := time.Unix(t, 0)
 		post := PostORM{
 			Timestamp:   rp.Timestamp,
 			Date:        dateOfTime(ts),

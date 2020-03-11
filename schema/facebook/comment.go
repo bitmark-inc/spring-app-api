@@ -45,12 +45,12 @@ func CommentArraySchemaLoader() *gojsonschema.Schema {
 
 type CommentORM struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	Timestamp   int64
+	Timestamp   int64     `gorm:"unique_index:facebook_comment_owner_timestamp_unique"`
 	Author      string
 	Comment     string
 	Date        string
 	Weekday     int
-	DataOwnerID string
+	DataOwnerID string `gorm:"unique_index:facebook_comment_owner_timestamp_unique"`
 }
 
 func (CommentORM) TableName() string {

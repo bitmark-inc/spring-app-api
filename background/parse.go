@@ -27,7 +27,7 @@ func (b *BackgroundContext) parseArchive(ctx context.Context, archiveType, accou
 
 	switch archiveType {
 	case "facebook":
-		if err := parser.ParseFacebookArchive(b.ormDB,
+		if err := parser.ParseFacebookArchive(b.ormDB.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"),
 			accountNumber, viper.GetString("archive.workdir"),
 			viper.GetString("aws.s3.bucket"),
 			strconv.FormatInt(archiveID, 10)); err != nil {

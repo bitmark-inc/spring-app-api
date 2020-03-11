@@ -43,13 +43,13 @@ func ReactionSchemaLoader() *gojsonschema.Schema {
 
 type ReactionORM struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	Timestamp   int64
+	Timestamp   int64     `gorm:"unique_index:facebook_reaction_owner_timestamp_unique"`
 	Date        string
 	Weekday     int
 	Title       string
 	Actor       string
 	Reaction    string
-	DataOwnerID string
+	DataOwnerID string `gorm:"unique_index:facebook_reaction_owner_timestamp_unique"`
 }
 
 func (ReactionORM) TableName() string {

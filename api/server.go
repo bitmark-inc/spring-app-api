@@ -182,6 +182,13 @@ func (s *Server) setupRouter() *gin.Engine {
 		postRoute.GET("", s.getAllPosts)
 	}
 
+	photoAndMediaRoute := apiRoute.Group("/photos_and_videos")
+	photoAndMediaRoute.Use(s.authMiddleware())
+	photoAndMediaRoute.Use(s.fakeCredential())
+	{
+		photoAndMediaRoute.GET("", s.getAllPostMedia)
+	}
+
 	mediaRoute := apiRoute.Group("/media")
 	mediaRoute.Use(s.authMiddleware())
 	mediaRoute.Use(s.fakeCredential())

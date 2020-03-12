@@ -127,6 +127,67 @@ func (s *Server) getPostStats(c *gin.Context) {
 	})
 }
 
+func (s *Server) getAllPostMedia(c *gin.Context) {
+	accountNumber := c.GetString("requester")
+
+	var params struct {
+		StartedAt int64 `form:"started_at"`
+		EndedAt   int64 `form:"ended_at"`
+		Limit     int64 `form:"limit"`
+	}
+
+	if err := c.BindQuery(&params); err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	if params.StartedAt >= params.EndedAt {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	if params.Limit > 1000 {
+		params.Limit = 1000
+	}
+
+	if params.Limit < 1 {
+		params.Limit = 100
+	}
+
+	results := make([]*struct {
+		Id                string `json:"id"`
+		MediaURI          string `json:"url"`
+		FilenameExtension string `json:"extension"`
+		Timestamp         int64  `json:"timestamp"`
+	}, 0)
+
+	if err := s.ormDB.Table("facebook_postmedia").
+		Joins("LEFT OUTER JOIN facebook_post ON facebook_postmedia.post_id = facebook_post.id").
+		Select("facebook_postmedia.id, facebook_postmedia.media_uri, facebook_postmedia.filename_extension, facebook_post.timestamp").
+		Where("facebook_postmedia.data_owner_id = ?", accountNumber).
+		Where("facebook_post.timestamp > ?", params.StartedAt).
+		Where("facebook_post.timestamp < ?", params.EndedAt).
+		Order("facebook_post.timestamp asc").
+		Limit(params.Limit).Scan(&results).Error; err != nil {
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	sess := session.New(s.awsConf)
+
+	for _, r := range results {
+		if url, err := s3util.GetMediaPresignedURL(sess, r.MediaURI, 10*time.Minute); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		} else {
+			r.MediaURI = url
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": results})
+}
+
 func (s *Server) getPostMediaURI(c *gin.Context) {
 	key := c.Query("key")
 	s3Key, err := url.QueryUnescape(key)

@@ -131,7 +131,7 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 				case "friends":
 					rawFriends := &facebook.RawFriends{}
 					json.Unmarshal(data, &rawFriends)
-					if err := gormbulk.BulkInsert(db, rawFriends.ORM(dataOwner), 1000); err != nil {
+					if err := gormbulk.BulkInsert(db, rawFriends.ORM(dataOwner), 500); err != nil {
 						// friends must exist for inserting tags
 						// stop processing if it fails to insert friends
 						sentry.CaptureException(err)
@@ -142,7 +142,7 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 					json.Unmarshal(data, &rawPosts.Items)
 					posts, complexPosts := rawPosts.ORM(dataOwner, fmt.Sprint(archive.ID),
 						metadata.FirstActivityTimestamp, metadata.LastActivityTimestamp)
-					if err := gormbulk.BulkInsert(db, posts, 1000); err != nil {
+					if err := gormbulk.BulkInsert(db, posts, 500); err != nil {
 						sentry.CaptureException(err)
 						continue
 					}
@@ -181,14 +181,14 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 				case "comments":
 					rawComments := &facebook.RawComments{}
 					json.Unmarshal(data, &rawComments)
-					if err := gormbulk.BulkInsert(db, rawComments.ORM(dataOwner), 1000); err != nil {
+					if err := gormbulk.BulkInsert(db, rawComments.ORM(dataOwner), 500); err != nil {
 						sentry.CaptureException(err)
 						continue
 					}
 				case "reactions":
 					rawReactions := &facebook.RawReactions{}
 					json.Unmarshal(data, &rawReactions)
-					if err := gormbulk.BulkInsert(db, rawReactions.ORM(dataOwner), 1000); err != nil {
+					if err := gormbulk.BulkInsert(db, rawReactions.ORM(dataOwner), 500); err != nil {
 						sentry.CaptureException(err)
 						continue
 					}

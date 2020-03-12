@@ -190,23 +190,13 @@ func (s *Server) postsCountStats(c *gin.Context) {
 	}
 	defer accountStatsRows.Close()
 
-	stats := map[string]map[string]int64{
-		"link": map[string]int64{
+	postTypes := []string{"link", "media", "undefined", "update"}
+	stats := map[string]map[string]int64{}
+	for _, r := range postTypes {
+		stats[r] = map[string]int64{
 			"sys_avg": 0,
 			"count":   0,
-		},
-		"media": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"undefined": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"update": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
+		}
 	}
 
 	for allStatsRows.Next() {
@@ -216,8 +206,9 @@ func (s *Server) postsCountStats(c *gin.Context) {
 			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 			return
 		}
-
-		stats[t]["sys_avg"] = count
+		if _, ok := stats[t]; ok {
+			stats[t]["sys_avg"] = count
+		}
 	}
 
 	for accountStatsRows.Next() {
@@ -227,7 +218,9 @@ func (s *Server) postsCountStats(c *gin.Context) {
 			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 			return
 		}
-		stats[t]["count"] = count
+		if _, ok := stats[t]; ok {
+			stats[t]["count"] = count
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": stats})
@@ -272,31 +265,13 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 	}
 	defer accountStatsRows.Close()
 
-	stats := map[string]map[string]int64{
-		"ANGER": map[string]int64{
+	reactionTypes := []string{"ANGER", "HAHA", "LIKE", "LOVE", "SORRY", "WOW"}
+	stats := map[string]map[string]int64{}
+	for _, r := range reactionTypes {
+		stats[r] = map[string]int64{
 			"sys_avg": 0,
 			"count":   0,
-		},
-		"HAHA": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"LIKE": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"LOVE": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"SORRY": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
-		"WOW": map[string]int64{
-			"sys_avg": 0,
-			"count":   0,
-		},
+		}
 	}
 
 	for allStatsRows.Next() {
@@ -307,7 +282,9 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 			return
 		}
 
-		stats[t]["sys_avg"] = count
+		if _, ok := stats[t]; ok {
+			stats[t]["sys_avg"] = count
+		}
 	}
 
 	for accountStatsRows.Next() {
@@ -317,7 +294,10 @@ func (s *Server) reactionsCountStats(c *gin.Context) {
 			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 			return
 		}
-		stats[t]["count"] = count
+
+		if _, ok := stats[t]; ok {
+			stats[t]["count"] = count
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": stats})

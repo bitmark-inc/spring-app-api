@@ -30,7 +30,7 @@ type ReactionData struct {
 
 func ReactionSchemaLoader() *gojsonschema.Schema {
 	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties:  false,
+		AllowAdditionalProperties:  true,
 		ExpandedStruct:             true,
 		RequiredFromJSONSchemaTags: true,
 	}

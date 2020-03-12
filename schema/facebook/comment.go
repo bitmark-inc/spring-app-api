@@ -32,7 +32,7 @@ type CommentData struct {
 
 func CommentArraySchemaLoader() *gojsonschema.Schema {
 	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties:  false,
+		AllowAdditionalProperties:  true,
 		ExpandedStruct:             true,
 		RequiredFromJSONSchemaTags: true,
 	}

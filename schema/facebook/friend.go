@@ -18,7 +18,7 @@ type Friend struct {
 
 func FriendSchemaLoader() *gojsonschema.Schema {
 	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties:  false,
+		AllowAdditionalProperties:  true,
 		ExpandedStruct:             true,
 		RequiredFromJSONSchemaTags: true,
 	}

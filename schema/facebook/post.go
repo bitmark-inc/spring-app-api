@@ -201,7 +201,7 @@ type PostData struct {
 
 func PostArraySchemaLoader() *gojsonschema.Schema {
 	reflector := jsonschema.Reflector{
-		AllowAdditionalProperties:  false,
+		AllowAdditionalProperties:  true,
 		ExpandedStruct:             true,
 		RequiredFromJSONSchemaTags: true,
 	}

@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
 
@@ -37,7 +37,8 @@ func (p *PGStore) InsertAccount(ctx context.Context, accountNumber string, encPu
 			&account.EncryptionPublicKey,
 			&account.Metadata,
 			&account.CreatedAt,
-			&account.UpdatedAt); err != nil {
+			&account.UpdatedAt,
+			&account.Deleting); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
@@ -64,7 +65,8 @@ func (p *PGStore) QueryAccount(ctx context.Context, params *store.AccountQueryPa
 			&account.EncryptionPublicKey,
 			&account.Metadata,
 			&account.CreatedAt,
-			&account.UpdatedAt); err != nil {
+			&account.UpdatedAt,
+			&account.Deleting); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
@@ -91,7 +93,8 @@ func (p *PGStore) UpdateAccountMetadata(ctx context.Context, params *store.Accou
 			&account.EncryptionPublicKey,
 			&account.Metadata,
 			&account.CreatedAt,
-			&account.UpdatedAt); err != nil {
+			&account.UpdatedAt,
+			&account.Deleting); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
 		}

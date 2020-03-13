@@ -12,6 +12,7 @@ type Account struct {
 	Metadata            map[string]interface{} `json:"metadata"`
 	CreatedAt           time.Time              `json:"created_at"`
 	UpdatedAt           time.Time              `json:"updated_at"`
+	Deleting            bool                   `json:"deleting"`
 }
 
 // Token represents an token on behalf of an account

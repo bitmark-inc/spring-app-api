@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
-	"github.com/bitmark-inc/spring-app-api/store"
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/gin-gonic/gin"
+	"github.com/bitmark-inc/spring-app-api/schema/spring"
+	"github.com/bitmark-inc/spring-app-api/store"
 )
 
 func (s *Server) accountRegister(c *gin.Context) {
@@ -150,6 +151,14 @@ func (s *Server) accountUpdateMetadata(c *gin.Context) {
 func (s *Server) accountDelete(c *gin.Context) {
 	account := c.MustGet("account").(*store.Account)
 
+	if err := s.ormDB.Model(&spring.AccountORM{
+		AccountNumber: account.AccountNumber,
+	}).Update("deleting", true).Error; err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
 	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
 		Name: "delete_user_data",
 		Args: []tasks.Arg{
@@ -161,7 +170,7 @@ func (s *Server) accountDelete(c *gin.Context) {
 	})
 	if err != nil {
 		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
 	}
 	log.Info("Enqueued job with id:", job.Signature.UUID)

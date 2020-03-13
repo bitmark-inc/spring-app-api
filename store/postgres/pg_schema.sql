@@ -23,7 +23,8 @@ CREATE TABLE fbm.account (
     enc_pub_key BYTEA DEFAULT NULL,
     metadata JSONB NOT NULL DEFAULT '{}'::json,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    deleting BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE fbm.token (

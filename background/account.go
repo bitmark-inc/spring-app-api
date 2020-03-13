@@ -15,13 +15,6 @@ import (
 func (b *BackgroundContext) deleteUserData(ctx context.Context, accountNumber string) error {
 	logEntity := log.WithField("prefix", "delete_user_data")
 
-	// Delete on postgres db
-	logEntity.Info("Remove postgres db")
-	if err := b.store.DeleteAccount(ctx, accountNumber); err != nil {
-		logEntity.Error(err)
-		sentry.CaptureException(err)
-	}
-
 	// Delete data on dynamodb
 	logEntity.Info("Remove post week stat")
 	if err := b.fbDataStore.RemoveFBStat(ctx, accountNumber+"/post-week-stat"); err != nil {
@@ -82,6 +75,13 @@ func (b *BackgroundContext) deleteUserData(ctx context.Context, accountNumber st
 	})
 
 	if err := s3manager.NewBatchDeleteWithClient(svc).Delete(ctx, iter); err != nil {
+		logEntity.Error(err)
+		sentry.CaptureException(err)
+	}
+
+	// Delete on postgres db
+	logEntity.Info("Remove postgres db")
+	if err := b.store.DeleteAccount(ctx, accountNumber); err != nil {
 		logEntity.Error(err)
 		sentry.CaptureException(err)
 	}

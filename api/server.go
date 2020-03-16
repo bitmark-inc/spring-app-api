@@ -94,20 +94,6 @@ func NewServer(store store.Store,
 
 // Run to run the server
 func (s *Server) Run(addr string) error {
-	// Login to bitsocial server
-	go func() {
-		for {
-			ctx := context.Background()
-			err := s.bitSocialClient.Login(ctx, viper.GetString("fbarchive.username"), viper.GetString("fbarchive.password"))
-			if err == nil {
-				log.Info("Success logged in to bitsocial server")
-				return
-			}
-			log.WithError(err).Error("Cannot connect to bitsocial server")
-			time.Sleep(1 * time.Minute)
-		}
-	}()
-
 	c, err := loadCountryContinentMap()
 	if err != nil {
 		return err
@@ -312,14 +298,6 @@ func (s *Server) healthz(c *gin.Context) {
 	// Ping db
 	err := s.store.Ping(c)
 	if shouldInterupt(err, c) {
-		return
-	}
-
-	// Check status of bitSocial client
-	if !s.bitSocialClient.IsReady() {
-		c.JSON(http.StatusBadGateway, gin.H{
-			"status": "bit social error",
-		})
 		return
 	}
 

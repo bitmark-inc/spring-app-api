@@ -86,7 +86,6 @@ var (
 	FBArchiveStatusStored = "stored"
 
 	// FBArchiveStatusProcessing when an archive is processing
-	// by bitsocial server and our server
 	FBArchiveStatusProcessing = "processing"
 
 	// FBArchiveStatusProcessed when an archive is processed

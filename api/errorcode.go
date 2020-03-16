@@ -15,7 +15,7 @@ var (
 		1005: "cannot parse request",
 		1006: "account not found",
 		1007: "API for this client version has been discontinued",
-		1008: "account is being deleted",
+		1008: "the account is under deletion",
 
 		2000: "file source is not supported",
 		2001: "invalid archive file",

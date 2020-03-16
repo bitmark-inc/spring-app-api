@@ -196,20 +196,6 @@ func main() {
 		HTTPClient: httpClient,
 	})
 
-	// Login to bitsocial server
-	go func(bitSocialClient *fbarchive.Client) {
-		for {
-			ctx := context.Background()
-			err := bitSocialClient.Login(ctx, viper.GetString("fbarchive.username"), viper.GetString("fbarchive.password"))
-			if err == nil {
-				log.Info("Success logged in to bitsocial server")
-				return
-			}
-			log.WithError(err).Error("Cannot connect to bitsocial server")
-			time.Sleep(1 * time.Minute)
-		}
-	}(bitSocialClient)
-
 	// Init db
 	pgstore, err := postgres.NewPGStore(context.Background())
 	if err != nil {

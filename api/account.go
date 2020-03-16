@@ -16,18 +16,6 @@ import (
 func (s *Server) accountRegister(c *gin.Context) {
 	accountNumber := c.GetString("requester")
 
-	account, err := s.store.QueryAccount(c, &store.AccountQueryParam{
-		AccountNumber: &accountNumber,
-	})
-	if shouldInterupt(err, c) {
-		return
-	}
-
-	if account != nil {
-		abortWithEncoding(c, http.StatusForbidden, errorAccountTaken)
-		return
-	}
-
 	var params struct {
 		EncPubKey string                 `json:"enc_pub_key"`
 		Metadata  map[string]interface{} `json:"metadata"`
@@ -39,24 +27,20 @@ func (s *Server) accountRegister(c *gin.Context) {
 		return
 	}
 
-	// Check if the account status
-	status, err := s.bitSocialClient.GetDataOwnerStatus(c, accountNumber)
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
+	account, err := s.store.QueryAccount(c, &store.AccountQueryParam{
+		AccountNumber: &accountNumber,
+	})
+	if shouldInterupt(err, c) {
 		return
 	}
 
-	if status == "DELETING" {
-		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
-		return
-	} else if status == "" {
-		// Register data owner
-		if err := s.bitSocialClient.NewDataOwner(c, accountNumber); err != nil {
-			log.Debug(err)
-			abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
+	if account != nil {
+		if account.Deleting {
+			abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
 			return
 		}
+		abortWithEncoding(c, http.StatusForbidden, errorAccountTaken)
+		return
 	}
 
 	// Save to db

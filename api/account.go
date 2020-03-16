@@ -72,25 +72,15 @@ func (s *Server) accountRegister(c *gin.Context) {
 func (s *Server) accountDetail(c *gin.Context) {
 	accountNumber := c.GetString("account_number")
 
-	log.Debug("Check data owner")
-
-	// Check if the account status
-	status, err := s.bitSocialClient.GetDataOwnerStatus(c, accountNumber)
-	if err != nil {
-		log.Debug(err)
-		abortWithEncoding(c, http.StatusBadGateway, errorInternalServer)
-		return
-	}
-
-	if status == "DELETING" {
-		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
-		return
-	}
-
 	account, err := s.store.QueryAccount(c, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,
 	})
 	if shouldInterupt(err, c) {
+		return
+	}
+
+	if account.Deleting {
+		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
 		return
 	}
 

@@ -17,7 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gogo/protobuf/proto"
 	"github.com/jinzhu/gorm"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/bitmark-inc/bitmark-sdk-go/account"
@@ -140,10 +139,16 @@ func (s *Server) setupRouter() *gin.Engine {
 	{
 		accountRoute.POST("", s.accountRegister)
 	}
+
 	accountRoute.Use(s.meRoute("me"))
 	{
 		accountRoute.GET("/:account_number", s.accountDetail)
+
+		accountRoute.POST("/:account_number/export", s.accountPrepareExport)
+		accountRoute.GET("/:account_number/export", s.accountExportStatus)
+		accountRoute.GET("/:account_number/export/download", s.accountDownloadExport)
 	}
+
 	accountRoute.Use(s.meRoute("me"))
 	accountRoute.Use(s.recognizeAccountMiddleware())
 	{

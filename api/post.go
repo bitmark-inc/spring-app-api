@@ -168,7 +168,7 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 		Where("facebook_postmedia.data_owner_id = ?", accountNumber).
 		Where("facebook_post.timestamp > ?", params.StartedAt).
 		Where("facebook_post.timestamp < ?", params.EndedAt).
-		Order("facebook_post.timestamp asc").
+		Order("facebook_post.timestamp desc").
 		Limit(params.Limit).Scan(&results).Error; err != nil {
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return

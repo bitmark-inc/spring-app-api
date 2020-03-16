@@ -22,6 +22,35 @@ func generateS3ArchiveKey(accountNumber, archiveType string, archiveID int64) st
 	return fmt.Sprintf("%s/%s/archives/%d/%s", accountNumber, archiveType, archiveID, "archive.zip")
 }
 
+func DownloadArchive(sess *session.Session, bucket, key string, file io.WriterAt) error {
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+
+	downloader := s3manager.NewDownloader(sess)
+	if _, err := downloader.Download(file, input); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UploadArchive upload archive files to S3
+func UploadFile(sess *session.Session, data io.Reader, fileKey string, metadata map[string]*string) error {
+	logEntity := log.WithField("prefix", "s3_util")
+
+	svc := s3manager.NewUploader(sess)
+
+	logEntity.WithField("key", fileKey).Info("Start uploading to S3")
+	_, err := svc.Upload(&s3manager.UploadInput{
+		Bucket:   aws.String(viper.GetString("aws.s3.bucket")),
+		Key:      aws.String(fileKey),
+		Body:     data,
+		Metadata: metadata,
+	})
+	return err
+}
+
 // UploadArchive upload archive files to S3
 func UploadArchive(sess *session.Session, data io.Reader, accountNumber, archiveType string, archiveID int64, metadata map[string]*string) (string, error) {
 	logEntity := log.WithField("prefix", "s3_util")

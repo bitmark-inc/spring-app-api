@@ -34,6 +34,7 @@ import (
 	"github.com/bitmark-inc/spring-app-api/external/geoservice"
 	"github.com/bitmark-inc/spring-app-api/external/onesignal"
 	"github.com/bitmark-inc/spring-app-api/logmodule"
+	"github.com/bitmark-inc/spring-app-api/schema/spring"
 	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/store/dynamodb"
 	"github.com/bitmark-inc/spring-app-api/store/postgres"
@@ -59,6 +60,7 @@ const (
 	jobNotificationFinish   = "notification_finish_parsing"
 	jobExtractTimeMetadata  = "extract_time_metadata"
 	jobGenerateHashContent  = "generate_hash_content"
+	jobPrepareDataExport    = "prepare_data_export"
 	jobDeleteUserData       = "delete_user_data"
 )
 
@@ -247,6 +249,7 @@ func main() {
 	server.RegisterTask(jobNotificationFinish, b.notifyAnalyzingDone)
 	server.RegisterTask(jobExtractTimeMetadata, b.extractTimeMetadata)
 	server.RegisterTask(jobGenerateHashContent, b.generateHashContent)
+	server.RegisterTask(jobPrepareDataExport, b.prepareUserExportData)
 	server.RegisterTask(jobDeleteUserData, b.deleteUserData)
 
 	workerName, err := os.Hostname()
@@ -256,7 +259,7 @@ func main() {
 	worker := server.NewWorker(workerName, viper.GetInt("worker.concurrency"))
 	// Map the name of jobs to handler functions
 	worker.SetPreTaskHandler(b.jobStartCollectiveMetric)
-	worker.SetPostTaskHandler(b.jobEndCollectiveMetric)
+	worker.SetPostTaskHandler(b.jobProcessedHandler)
 	worker.SetErrorHandler(b.jobErrorHandler)
 
 	if err := worker.Launch(); err != nil {
@@ -320,9 +323,31 @@ func (b *BackgroundContext) jobStartCollectiveMetric(signature *tasks.Signature)
 	currentProcessingGaugeVec.WithLabelValues(signature.Name).Inc()
 }
 
-func (b *BackgroundContext) jobEndCollectiveMetric(signature *tasks.Signature) {
-	totalProcessedCounterVec.WithLabelValues(signature.Name).Inc()
-	currentProcessingGaugeVec.WithLabelValues(signature.Name).Dec()
+func (b *BackgroundContext) jobProcessedHandler(signature *tasks.Signature) {
+	logEntry := log.WithField("uuid", signature.UUID)
+	logEntry.Debug("job done")
+
+	switch signature.Name {
+	case jobPrepareDataExport:
+		// Update spring archive job state when it is run
+		state, err := server.GetBackend().GetState(signature.UUID)
+		if err != nil {
+			logEntry.WithError(err).Error("fail to get task state")
+			sentry.CaptureException(err)
+		}
+
+		logEntry.WithField("state", state.State).Info("update archive task state")
+		if err := b.ormDB.Model(&spring.ArchiveORM{}).
+			Where("job_id = ?", signature.UUID).
+			Update("status", state.State).
+			Error; err != nil {
+			logEntry.WithError(err).Error("fail to update archive state")
+			sentry.CaptureException(err)
+		}
+	default:
+		totalProcessedCounterVec.WithLabelValues(signature.Name).Inc()
+		currentProcessingGaugeVec.WithLabelValues(signature.Name).Dec()
+	}
 }
 
 func (b *BackgroundContext) jobErrorHandler(err error) {

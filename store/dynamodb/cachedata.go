@@ -87,27 +87,49 @@ func (d *DynamoDBStore) AddFBStats(ctx context.Context, data []store.FbData) err
 	return err
 }
 
-func (d *DynamoDBStore) queryFBStatResult(input *dynamodb.QueryInput) ([][]byte, error) {
-	result, err := d.svc.Query(input)
-	if err != nil {
-		return nil, err
-	}
-
-	var items []store.FbData
-
-	if err := dynamodbattribute.UnmarshalListOfMaps(result.Items, &items); err != nil {
-		return nil, err
-	}
-
+func (d *DynamoDBStore) queryFBStatResult(input *dynamodb.QueryInput, limit int64) ([][]byte, error) {
 	var data [][]byte
-	for _, i := range items {
-		data = append(data, i.Data)
+
+	for {
+		result, err := d.svc.Query(input)
+		if err != nil {
+			return nil, err
+		}
+
+		var items []store.FbData
+
+		if err := dynamodbattribute.UnmarshalListOfMaps(result.Items, &items); err != nil {
+			return nil, err
+		}
+
+		for _, i := range items {
+			data = append(data, i.Data)
+		}
+
+		if limit > 0 && len(data) > int(limit) {
+			return data[0:limit], nil
+		}
+
+		if *result.Count == 0 {
+			break
+		}
+
+		if result.LastEvaluatedKey == nil {
+			break
+		} else {
+			input.ExclusiveStartKey = result.LastEvaluatedKey
+		}
 	}
 
 	return data, nil
 }
 
 func (d *DynamoDBStore) GetFBStat(ctx context.Context, key string, from, to, limit int64) ([][]byte, error) {
+	queryLimit := aws.Int64(1000)
+	if limit != 0 {
+		queryLimit = aws.Int64(limit)
+	}
+
 	input := &dynamodb.QueryInput{
 		TableName: d.table,
 		KeyConditions: map[string]*dynamodb.Condition{
@@ -131,11 +153,11 @@ func (d *DynamoDBStore) GetFBStat(ctx context.Context, key string, from, to, lim
 				},
 			},
 		},
-		Limit:            aws.Int64(limit),
+		Limit:            queryLimit,
 		ScanIndexForward: aws.Bool(false),
 	}
 
-	return d.queryFBStatResult(input)
+	return d.queryFBStatResult(input, limit)
 }
 
 func (d *DynamoDBStore) GetExactFBStat(ctx context.Context, key string, in int64) ([]byte, error) {

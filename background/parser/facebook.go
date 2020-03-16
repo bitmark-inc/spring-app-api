@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/bitmark-inc/datapod/data-parser/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	gormbulk "github.com/t-tiger/gorm-bulk-insert"
 
 	fbutil "github.com/bitmark-inc/spring-app-api/archives/facebook"
+	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/schema/spring"
 )
@@ -28,12 +30,12 @@ var patterns = []facebook.Pattern{
 }
 
 // TODO: Decouple working dir, gorm, bucket name
-func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, archiveID string) error {
+func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, workingDir, s3Bucket, archiveID string) error {
 	contextLogger := log.WithFields(log.Fields{"archive_id": archiveID})
 	contextLogger.Info("start parsing archive:", archiveID)
 
-	var archive spring.ArchiveORM
-	if err := db.Model(spring.ArchiveORM{}).Where("id = ?", archiveID).First(&archive).Error; err != nil {
+	var archive spring.FBArchiveORM
+	if err := db.Model(spring.FBArchiveORM{}).Where("id = ?", archiveID).First(&archive).Error; err != nil {
 		sentry.CaptureException(err)
 		return err
 	}
@@ -83,7 +85,7 @@ func ParseFacebookArchive(db *gorm.DB, accountNumber, workingDir, s3Bucket, arch
 	defer file.Close()
 	defer fs.RemoveAll(localOwnerDir)
 
-	if err := storage.DownloadArchiveFromS3(s3Bucket, archive.FileKey, file); err != nil {
+	if err := s3util.DownloadArchive(sess, s3Bucket, archive.FileKey, file); err != nil {
 		sentry.CaptureException(err)
 		return err
 	}

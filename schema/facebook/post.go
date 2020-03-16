@@ -29,9 +29,9 @@ type PostORM struct {
 	MediaAttached         bool
 	Sentiment             string
 	DataOwnerID           string         `gorm:"unique_index:facebook_post_owner_timestamp_unique"`
-	MediaItems            []PostMediaORM `gorm:"foreignkey:PostID;association_foreignkey:ID"`
-	Places                []PlaceORM     `gorm:"foreignkey:PostID;association_foreignkey:ID"`
-	Tags                  []TagORM       `gorm:"foreignkey:PostID;association_foreignkey:ID"`
+	MediaItems            []PostMediaORM `gorm:"foreignkey:PostID;association_foreignkey:ID" json:"-"`
+	Places                []PlaceORM     `gorm:"foreignkey:PostID;association_foreignkey:ID" json:"-"`
+	Tags                  []TagORM       `gorm:"foreignkey:PostID;association_foreignkey:ID" json:"-"`
 	ConflictFlag          bool
 }
 
@@ -52,7 +52,7 @@ type PostMediaORM struct {
 	MediaURI          string    `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
 	FilenameExtension string
 	DataOwnerID       string  `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
-	Post              PostORM `gorm:"foreignkey:PostID"`
+	Post              PostORM `gorm:"foreignkey:PostID" json:"-"`
 	PostID            uuid.UUID
 	ConflictFlag      bool
 }
@@ -68,7 +68,7 @@ type PlaceORM struct {
 	Latitude     float64
 	Longitude    float64
 	DataOwnerID  string    `gorm:"unique_index:facebook_place_owner_timestamp_unique"`
-	Post         PostORM   `gorm:"foreignkey:PostID"`
+	Post         PostORM   `gorm:"foreignkey:PostID" json:"-"`
 	PostID       uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE: once post one place
 	ConflictFlag bool
 }
@@ -80,9 +80,9 @@ func (PlaceORM) TableName() string {
 type TagORM struct {
 	ID           uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
 	DataOwnerID  string    `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
-	Post         PostORM   `gorm:"foreignkey:PostID"`
+	Post         PostORM   `gorm:"foreignkey:PostID" json:"-"`
 	PostID       uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
-	Friend       FriendORM `gorm:"foreignkey:FriendID"`
+	Friend       FriendORM `gorm:"foreignkey:FriendID" json:"-"`
 	FriendID     uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
 	FriendName   string
 	ConflictFlag bool

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/aws/aws-sdk-go/aws/session"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -27,7 +28,11 @@ func (b *BackgroundContext) parseArchive(ctx context.Context, archiveType, accou
 
 	switch archiveType {
 	case "facebook":
-		if err := parser.ParseFacebookArchive(b.ormDB.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"),
+		sess, err := session.NewSession(b.awsConf)
+		if err != nil {
+			return jobError(err)
+		}
+		if err := parser.ParseFacebookArchive(sess, b.ormDB.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"),
 			accountNumber, viper.GetString("archive.workdir"),
 			viper.GetString("aws.s3.bucket"),
 			strconv.FormatInt(archiveID, 10)); err != nil {

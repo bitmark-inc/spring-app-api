@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
+	"github.com/bitmark-inc/spring-app-api/schema/spring"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/spf13/viper"
@@ -37,6 +38,7 @@ func main() {
 		&facebook.PostMediaORM{},
 		&facebook.ReactionORM{},
 		&facebook.TagORM{},
+		&spring.ArchiveORM{},
 	)
 
 	db.Model(facebook.PostORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")

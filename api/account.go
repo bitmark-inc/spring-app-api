@@ -4,11 +4,15 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/schema/spring"
 	"github.com/bitmark-inc/spring-app-api/store"
 )
@@ -130,6 +134,89 @@ func (s *Server) accountUpdateMetadata(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"result": account})
+}
+
+func (s *Server) accountPrepareExport(c *gin.Context) {
+	accountNumber := c.GetString("account_number")
+	jobID := uuid.New()
+
+	a := &spring.ArchiveORM{
+		JobID:         &jobID,
+		Status:        "PENDING",
+		AccountNumber: accountNumber,
+	}
+	if err := s.ormDB.Create(a).Error; err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	job, err := s.backgroundEnqueuer.SendTask(&tasks.Signature{
+		UUID: jobID.String(),
+		Name: "prepare_data_export",
+		Args: []tasks.Arg{
+			{
+				Type:  "string",
+				Value: accountNumber,
+			},
+			{
+				Type:  "string",
+				Value: a.ID.String(),
+			},
+		},
+	})
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	log.Info("Enqueued job with id:", job.Signature.UUID)
+
+	// Return success
+	c.JSON(http.StatusOK, gin.H{"result": "OK"})
+}
+
+func (s *Server) accountExportStatus(c *gin.Context) {
+	accountNumber := c.GetString("account_number")
+
+	var a spring.ArchiveORM
+
+	if err := s.ormDB.Where("account_number = ?", accountNumber).Order("created_at desc").First(&a).Error; err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": a})
+}
+
+func (s *Server) accountDownloadExport(c *gin.Context) {
+	accountNumber := c.GetString("account_number")
+
+	var a spring.ArchiveORM
+
+	if err := s.ormDB.Where("account_number = ?", accountNumber).Order("created_at desc").First(&a).Error; err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	sess, err := session.NewSession(s.awsConf)
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	url, err := s3util.GetMediaPresignedURL(sess, a.FileKey, 5*time.Minute)
+	if err != nil {
+		log.Debug(err)
+		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+		return
+	}
+
+	c.Redirect(http.StatusSeeOther, url)
 }
 
 func (s *Server) accountDelete(c *gin.Context) {

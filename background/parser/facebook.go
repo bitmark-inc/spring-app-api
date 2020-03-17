@@ -3,10 +3,10 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/bitmark-inc/datapod/data-parser/storage"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -18,6 +18,7 @@ import (
 	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/schema/spring"
+	"github.com/bitmark-inc/spring-app-api/ziputil"
 )
 
 var patterns = []facebook.Pattern{
@@ -77,11 +78,16 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 	localUnarchivedDataDir := filepath.Join(localOwnerDir, "data")
 
 	fs := afero.NewOsFs()
-	file, err := storage.CreateFile(fs, localArchivePath)
+	if err := fs.MkdirAll(filepath.Dir(localArchivePath), os.FileMode(0777)); err != nil {
+		sentry.CaptureException(err)
+		return err
+	}
+	file, err := fs.Create(localArchivePath)
 	if err != nil {
 		sentry.CaptureException(err)
 		return err
 	}
+
 	defer file.Close()
 	defer fs.RemoveAll(localOwnerDir)
 
@@ -98,7 +104,7 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 	for _, pattern := range patterns {
 		contextLogger.WithField("type", pattern.Name).Info("parsing and inserting records into db")
 
-		if err := storage.ExtractArchive(localArchivePath, pattern.Location, localUnarchivedDataDir); err != nil {
+		if err := ziputil.Extract(localArchivePath, pattern.Location, localUnarchivedDataDir); err != nil {
 			sentry.CaptureException(err)
 			return err
 		}
@@ -107,7 +113,7 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 		if pattern.Name == "media" || pattern.Name == "files" {
 			contextLogger.Info("uploading ", pattern.Name, " files to ", fmt.Sprintf("%s/facebook/archives/%s/data", dataOwner, fmt.Sprint(archive.ID)))
 
-			if err := storage.UploadDirToS3(s3Bucket, fmt.Sprintf("%s/facebook/archives/%s/data", dataOwner, fmt.Sprint(archive.ID)), subDir); err != nil {
+			if err := s3util.UploadDir(sess, s3Bucket, fmt.Sprintf("%s/facebook/archives/%s/data", dataOwner, fmt.Sprint(archive.ID)), subDir); err != nil {
 				sentry.CaptureException(err)
 				continue
 			}

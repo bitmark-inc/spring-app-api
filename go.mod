@@ -9,7 +9,6 @@ require (
 	github.com/aws/aws-lambda-go v1.15.0
 	github.com/aws/aws-sdk-go v1.28.14
 	github.com/bitmark-inc/bitmark-sdk-go v0.2.1
-	github.com/bitmark-inc/datapod/data-parser v0.0.0-20200226020639-2733bb02fe5f
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/getsentry/sentry-go v0.5.1
 	github.com/gin-contrib/cors v1.3.0

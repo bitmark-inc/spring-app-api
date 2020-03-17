@@ -3,6 +3,7 @@ package s3util
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -33,6 +34,15 @@ func DownloadArchive(sess *session.Session, bucket, key string, file io.WriterAt
 		return err
 	}
 	return nil
+}
+
+func UploadDir(sess *session.Session, bucket, keyPrefix, dirpath string) error {
+	if _, err := os.Stat(dirpath); os.IsNotExist(err) {
+		return nil
+	}
+	svc := s3manager.NewUploader(sess)
+	iter := NewDirectoryIterator(bucket, dirpath, keyPrefix)
+	return svc.UploadWithIterator(aws.BackgroundContext(), iter)
 }
 
 // UploadArchive upload archive files to S3

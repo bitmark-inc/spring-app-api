@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-func ArchiveDirectory(dirname string, file io.Writer) error {
+func Archive(dirname string, w io.Writer) error {
 
-	archive := zip.NewWriter(file)
+	archive := zip.NewWriter(w)
 	defer archive.Close()
 
 	return filepath.Walk(dirname, func(path string, info os.FileInfo, err error) error {

@@ -23,8 +23,8 @@ import (
 	"github.com/bitmark-inc/spring-app-api/ziputil"
 )
 
-func objectToFile(v interface{}, file io.Writer) error {
-	e := json.NewEncoder(file)
+func writeJSON(w io.Writer, v interface{}) error {
+	e := json.NewEncoder(w)
 	return e.Encode(v)
 }
 
@@ -113,7 +113,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 	if len(fbArchives) > 0 {
 		// Prepare facebook archives
 		archiveFolder := path.Join(tmpDirname, "fb_archives")
-		if err != fs.Mkdir(archiveFolder, os.FileMode(0777)) {
+		if err != fs.Mkdir(archiveFolder, os.FileMode(0755)) {
 			logEntity.Error(err)
 			sentry.CaptureException(err)
 			return err
@@ -147,7 +147,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 
 	// Generate archive folder for all spring generated data
 	archiveFolder := path.Join(tmpDirname, "spring_archives")
-	if err != fs.Mkdir(archiveFolder, os.FileMode(0777)) {
+	if err != fs.Mkdir(archiveFolder, os.FileMode(0755)) {
 		logEntity.Error(err)
 		sentry.CaptureException(err)
 		return err
@@ -168,7 +168,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(reactions, file); err != nil {
+		if err := writeJSON(file, reactions); err != nil {
 			logEntity.Error(err)
 			// sentry.CaptureException(err)
 			return err
@@ -192,7 +192,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(posts, file); err != nil {
+		if err := writeJSON(file, posts); err != nil {
 			logEntity.Error(err)
 			// sentry.CaptureException(err)
 			return err
@@ -218,7 +218,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 					return err
 				}
 
-				if err := objectToFile(usages, file); err != nil {
+				if err := writeJSON(file, usages); err != nil {
 					logEntity.Error(err)
 					// sentry.CaptureException(err)
 					return err
@@ -246,7 +246,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -271,7 +271,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -296,7 +296,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -321,7 +321,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -346,7 +346,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -371,7 +371,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -396,7 +396,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		if err := objectToFile(data, file); err != nil {
+		if err := writeJSON(file, data); err != nil {
 			logEntity.Error(err)
 			return err
 		}
@@ -412,7 +412,7 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 		return err
 	}
 	defer zipFile.Close()
-	if err := ziputil.ArchiveDirectory(tmpDirname, zipFile); err != nil {
+	if err := ziputil.Archive(tmpDirname, zipFile); err != nil {
 		logEntity.Error(err)
 		return err
 	}

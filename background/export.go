@@ -411,7 +411,9 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 		sentry.CaptureException(err)
 		return err
 	}
+	defer fs.Remove(zipFile.Name())
 	defer zipFile.Close()
+
 	if err := ziputil.Archive(tmpDirname, zipFile); err != nil {
 		logEntity.Error(err)
 		return err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
@@ -41,6 +42,8 @@ func main() {
 		&spring.ArchiveORM{},
 	)
 
+	// The following are customized indexes for each ORM
+
 	db.Model(facebook.PostORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")
 	db.Model(facebook.PostORM{}).AddForeignKey("data_owner_id", "account(account_number)", "CASCADE", "NO ACTION")
 
@@ -69,4 +72,9 @@ func main() {
 
 	db.Model(facebook.CommentORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")
 	db.Model(facebook.CommentORM{}).AddForeignKey("data_owner_id", "account(account_number)", "CASCADE", "NO ACTION")
+
+	db.Model(spring.ArchiveORM{}).RemoveForeignKey("account_number", "account(account_number)")
+	db.Model(spring.ArchiveORM{}).AddForeignKey("account_number", "account(account_number)", "CASCADE", "NO ACTION")
+	db.Model(spring.ArchiveORM{}).Where(fmt.Sprintf("status != '%s' AND status != '%s'", "FAILURE", "SUCCESS")).
+		AddUniqueIndex("archive_account_unique_if_not_done", "account_number")
 }

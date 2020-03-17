@@ -20,7 +20,7 @@ func (AccountORM) TableName() string {
 // Spring app total archive
 type ArchiveORM struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	JobID         *uuid.UUID `gorm:"type:uuid;`
+	JobID         *uuid.UUID `gorm:"type:uuid"`
 	Status        string
 	FileKey       string
 	AccountNumber string

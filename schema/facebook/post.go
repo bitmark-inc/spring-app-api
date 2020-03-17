@@ -50,6 +50,7 @@ func (p *PostORM) BeforeCreate(scope *gorm.Scope) error {
 type PostMediaORM struct {
 	ID                uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
 	MediaURI          string    `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
+	ThumbnailURI      string
 	FilenameExtension string
 	DataOwnerID       string  `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
 	Post              PostORM `gorm:"foreignkey:PostID" json:"-"`
@@ -132,8 +133,12 @@ func (r *RawPosts) ORM(dataOwner, archiveID string, beginTime, endTime int64) ([
 					uri := fmt.Sprintf("%s/facebook/archives/%s/data/%s", dataOwner, archiveID, string(item.Media.URI))
 					postMedia := PostMediaORM{
 						MediaURI:          uri,
+						ThumbnailURI:      uri,
 						FilenameExtension: filepath.Ext(string(item.Media.URI)),
 						DataOwnerID:       dataOwner,
+					}
+					if item.Media.Thumbnail != nil {
+						postMedia.ThumbnailURI = fmt.Sprintf("%s/facebook/archives/%s/data/%s", dataOwner, archiveID, string(item.Media.Thumbnail.URI))
 					}
 					post.MediaItems = append(post.MediaItems, postMedia)
 					complex = true

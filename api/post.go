@@ -157,14 +157,15 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 
 	results := make([]*struct {
 		Id                string `json:"id"`
-		MediaURI          string `json:"url"`
+		MediaURI          string `json:"source"`
+		ThumbnailURI      string `json:"thumbnail"`
 		FilenameExtension string `json:"extension"`
 		Timestamp         int64  `json:"timestamp"`
 	}, 0)
 
 	if err := s.ormDB.Table("facebook_postmedia").
 		Joins("LEFT OUTER JOIN facebook_post ON facebook_postmedia.post_id = facebook_post.id").
-		Select("facebook_postmedia.id, facebook_postmedia.media_uri, facebook_postmedia.filename_extension, facebook_post.timestamp").
+		Select("facebook_postmedia.id, facebook_postmedia.media_uri, facebook_postmedia.thumbnail_uri, facebook_postmedia.filename_extension, facebook_post.timestamp").
 		Where("facebook_postmedia.data_owner_id = ?", accountNumber).
 		Where("facebook_post.timestamp > ?", params.StartedAt).
 		Where("facebook_post.timestamp < ?", params.EndedAt).
@@ -182,6 +183,13 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 			return
 		} else {
 			r.MediaURI = url
+		}
+
+		if url, err := s3util.GetMediaPresignedURL(sess, r.ThumbnailURI, 10*time.Minute); err != nil {
+			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+			return
+		} else {
+			r.ThumbnailURI = url
 		}
 	}
 

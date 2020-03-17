@@ -48,10 +48,14 @@ func (b *BackgroundContext) extractPost(ctx context.Context, accountNumber strin
 				if m.FilenameExtension == ".mp4" {
 					mediaType = "video"
 				}
+				thumbnailURI := m.ThumbnailURI
+				if thumbnailURI == "" {
+					thumbnailURI = m.MediaURI
+				}
 				media = append(media, &protomodel.MediaData{
 					Type:      mediaType,
 					Source:    m.MediaURI,
-					Thumbnail: m.MediaURI,
+					Thumbnail: thumbnailURI,
 				})
 			}
 		} else if p.ExternalContextURL != "" {

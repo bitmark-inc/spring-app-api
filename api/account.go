@@ -128,13 +128,14 @@ func (s *Server) accountUpdateMetadata(c *gin.Context) {
 }
 
 func (s *Server) accountPrepareExport(c *gin.Context) {
-	accountNumber := c.GetString("account_number")
+	account := c.MustGet("account").(*store.Account)
+
 	jobID := uuid.New()
 
 	a := &spring.ArchiveORM{
 		JobID:         &jobID,
 		Status:        "PENDING",
-		AccountNumber: accountNumber,
+		AccountNumber: account.AccountNumber,
 	}
 	if err := s.ormDB.Create(a).Error; err != nil {
 		if pgerr, ok := err.(*pq.Error); ok {
@@ -153,7 +154,7 @@ func (s *Server) accountPrepareExport(c *gin.Context) {
 		Args: []tasks.Arg{
 			{
 				Type:  "string",
-				Value: accountNumber,
+				Value: account.AccountNumber,
 			},
 			{
 				Type:  "string",
@@ -174,11 +175,11 @@ func (s *Server) accountPrepareExport(c *gin.Context) {
 }
 
 func (s *Server) accountExportStatus(c *gin.Context) {
-	accountNumber := c.GetString("account_number")
+	account := c.MustGet("account").(*store.Account)
 
 	var a spring.ArchiveORM
 
-	if err := s.ormDB.Where("account_number = ?", accountNumber).Order("created_at desc").First(&a).Error; err != nil {
+	if err := s.ormDB.Where("account_number = ?", account.AccountNumber).Order("created_at desc").First(&a).Error; err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
@@ -188,11 +189,11 @@ func (s *Server) accountExportStatus(c *gin.Context) {
 }
 
 func (s *Server) accountDownloadExport(c *gin.Context) {
-	accountNumber := c.GetString("account_number")
+	account := c.MustGet("account").(*store.Account)
 
 	var a spring.ArchiveORM
 
-	if err := s.ormDB.Where("account_number = ?", accountNumber).Order("created_at desc").First(&a).Error; err != nil {
+	if err := s.ormDB.Where("account_number = ?", account.AccountNumber).Order("created_at desc").First(&a).Error; err != nil {
 		log.Debug(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return

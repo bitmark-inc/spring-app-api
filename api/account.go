@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/bitmark-inc/spring-app-api/s3util"
@@ -136,7 +137,12 @@ func (s *Server) accountPrepareExport(c *gin.Context) {
 		AccountNumber: accountNumber,
 	}
 	if err := s.ormDB.Create(a).Error; err != nil {
-		log.Debug(err)
+		if pgerr, ok := err.(*pq.Error); ok {
+			if pgerr.Code == "23505" {
+				abortWithEncoding(c, http.StatusInternalServerError, errorMultipleExportingIsNotAllowed)
+				return
+			}
+		}
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
 	}

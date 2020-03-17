@@ -39,6 +39,7 @@ type FBArchiveORM struct {
 	FileKey          string
 	ProcessingStatus string
 	ProcessingError  json.RawMessage
+	CreatedAt        time.Time
 }
 
 func (FBArchiveORM) TableName() string {

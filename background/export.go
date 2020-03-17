@@ -126,8 +126,8 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 			return err
 		}
 
-		for i, a := range fbArchives {
-			archivePath := path.Join(archiveFolder, fmt.Sprintf("archive-%d.zip", i+1))
+		for _, a := range fbArchives {
+			archivePath := path.Join(archiveFolder, fmt.Sprintf("archive-%d.zip", a.CreatedAt.Unix()))
 			file, err := fs.Create(archivePath)
 			if err != nil {
 				log.Error(err)

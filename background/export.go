@@ -20,6 +20,7 @@ import (
 	"github.com/bitmark-inc/spring-app-api/s3util"
 	"github.com/bitmark-inc/spring-app-api/schema/facebook"
 	"github.com/bitmark-inc/spring-app-api/schema/spring"
+	"github.com/bitmark-inc/spring-app-api/store"
 	"github.com/bitmark-inc/spring-app-api/ziputil"
 )
 
@@ -104,7 +105,10 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 	defer fs.RemoveAll(tmpDirname)
 
 	var fbArchives []spring.FBArchiveORM
-	if err := b.ormDB.Where("account_number = ?", accountNumber).Find(&fbArchives).Error; err != nil {
+	if err := b.ormDB.
+		Where("account_number = ?", accountNumber).
+		Where("processing_status = ?", store.FBArchiveStatusProcessed). // only export processed archives
+		Find(&fbArchives).Error; err != nil {
 		logEntity.Error(err)
 		sentry.CaptureException(err)
 		return err

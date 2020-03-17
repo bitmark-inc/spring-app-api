@@ -241,8 +241,6 @@ func main() {
 
 	server.RegisterTask(jobDownloadArchive, b.downloadArchive)
 	server.RegisterTask(jobParseArchive, b.parseArchive)
-	// server.RegisterTask(jobUploadArchive, b.submitArchive)
-	// server.RegisterTask(jobPeriodicArchiveCheck, b.checkArchive)
 	server.RegisterTask(jobAnalyzePosts, b.extractPost)
 	server.RegisterTask(jobAnalyzeReactions, b.extractReaction)
 	server.RegisterTask(jobAnalyzeSentiments, b.extractSentiment)

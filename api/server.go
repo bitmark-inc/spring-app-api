@@ -140,27 +140,22 @@ func (s *Server) setupRouter() *gin.Engine {
 		accountRoute.POST("", s.accountRegister)
 	}
 
-	accountRoute.Use(s.meRoute("me"))
-	{
-		accountRoute.GET("/:account_number", s.accountDetail)
-
-		accountRoute.POST("/:account_number/export", s.accountPrepareExport)
-		accountRoute.GET("/:account_number/export", s.accountExportStatus)
-		accountRoute.GET("/:account_number/export/download", s.accountDownloadExport)
-	}
-
-	accountRoute.Use(s.meRoute("me"))
 	accountRoute.Use(s.recognizeAccountMiddleware())
 	{
-		accountRoute.PATCH("/:account_number", s.accountUpdateMetadata)
-		accountRoute.DELETE("/:account_number", s.accountDelete)
+		accountRoute.GET("/me", s.accountDetail)
+
+		accountRoute.PATCH("/me", s.accountUpdateMetadata)
+		accountRoute.DELETE("/me", s.accountDelete)
+
+		accountRoute.POST("/me/export", s.accountPrepareExport)
+		accountRoute.GET("/me/export", s.accountExportStatus)
+		accountRoute.GET("/me/export/download", s.accountDownloadExport)
 	}
 
 	archivesRoute := apiRoute.Group("/archives")
 	archivesRoute.Use(s.authMiddleware())
 	archivesRoute.Use(s.recognizeAccountMiddleware())
 	{
-		// archivesRoute.POST("", s.downloadFBArchive)
 		archivesRoute.POST("", s.uploadArchive)
 		archivesRoute.POST("url", s.uploadArchiveByURL)
 		archivesRoute.GET("", s.getAllArchives)

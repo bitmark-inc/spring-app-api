@@ -71,7 +71,7 @@ func (s *Server) accountRegister(c *gin.Context) {
 }
 
 func (s *Server) accountDetail(c *gin.Context) {
-	accountNumber := c.GetString("account_number")
+	accountNumber := c.GetString("requester")
 
 	account, err := s.store.QueryAccount(c, &store.AccountQueryParam{
 		AccountNumber: &accountNumber,

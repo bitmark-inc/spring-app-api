@@ -81,13 +81,13 @@ func (s *Server) accountDetail(c *gin.Context) {
 		return
 	}
 
-	if account.Deleting {
-		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
+	if account == nil {
+		abortWithEncoding(c, http.StatusUnauthorized, errorAccountNotFound)
 		return
 	}
 
-	if account == nil {
-		abortWithEncoding(c, http.StatusUnauthorized, errorAccountNotFound)
+	if account.Deleting {
+		abortWithEncoding(c, http.StatusBadRequest, errorAccountDeleting)
 		return
 	}
 

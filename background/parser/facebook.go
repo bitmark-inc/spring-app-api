@@ -104,7 +104,7 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 	for _, pattern := range patterns {
 		contextLogger.WithField("type", pattern.Name).Info("parsing and inserting records into db")
 
-		if err := ziputil.Extract(localArchivePath, pattern.Location, localUnarchivedDataDir); err != nil {
+		if err := ziputil.Extract(localArchivePath, localUnarchivedDataDir, pattern.Location); err != nil {
 			sentry.CaptureException(err)
 			return err
 		}

@@ -10,7 +10,6 @@ import (
 )
 
 func Archive(dirname string, w io.Writer) error {
-
 	archive := zip.NewWriter(w)
 	defer archive.Close()
 
@@ -48,7 +47,7 @@ func Archive(dirname string, w io.Writer) error {
 
 }
 
-func Extract(source, target, destination string) error {
+func Extract(source, destination, filter string) error {
 	r, err := zip.OpenReader(source)
 	if err != nil {
 		return err
@@ -56,52 +55,59 @@ func Extract(source, target, destination string) error {
 	defer r.Close()
 
 	for _, f := range r.File {
-		if within(target, f.Name) {
-			fpath := filepath.Join(destination, f.Name)
+		if filter != "" && !within(filter, f.Name) {
+			continue
+		}
 
-			// check for Zip Slip vulnerability: http://bit.ly/2MsjAWE
-			if !strings.HasPrefix(fpath, filepath.Clean(destination)+string(os.PathSeparator)) {
-				return fmt.Errorf("zip slip detected")
-			}
-
-			if f.FileInfo().IsDir() {
-				if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
-				return err
-			}
-
-			outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			if err != nil {
-				return err
-			}
-
-			rc, err := f.Open()
-			if err != nil {
-				return err
-			}
-
-			_, err = io.Copy(outFile, rc)
-
-			outFile.Close()
-			rc.Close()
-
-			if err != nil {
-				return err
-			}
+		if err := saveZipFile(destination, f); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func within(parent, sub string) bool {
-	rel, err := filepath.Rel(parent, sub)
+// saveZipFile saves a file of zipfile to destination
+func saveZipFile(destination string, file *zip.File) error {
+	fpath := filepath.Join(destination, file.Name)
+
+	// check for Zip Slip vulnerability: http://bit.ly/2MsjAWE
+	if !strings.HasPrefix(fpath, filepath.Clean(destination)+string(os.PathSeparator)) {
+		return fmt.Errorf("zip slip detected")
+	}
+
+	if file.FileInfo().IsDir() {
+		if err := os.MkdirAll(fpath, os.ModePerm); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+		return err
+	}
+
+	outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	rc, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	_, err = io.Copy(outFile, rc)
+	return err
+}
+
+// within returns true if a path is relatively inside a parent directory
+func within(parent, path string) bool {
+	rel, err := filepath.Rel(parent, path)
 	if err != nil {
 		return false
 	}
+
 	return !strings.Contains(rel, "..")
 }

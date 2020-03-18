@@ -72,7 +72,7 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 	// 		 and more...
 	dataOwner := accountNumber
 
-	localOwnerDir := filepath.Join(workingDir, dataOwner)
+	localOwnerDir := filepath.Join(workingDir, dataOwner, archiveID)
 	localArchiveName := filepath.Base(archive.FileKey)
 	localArchivePath := filepath.Join(localOwnerDir, "archive", localArchiveName)
 	localUnarchivedDataDir := filepath.Join(localOwnerDir, "data")

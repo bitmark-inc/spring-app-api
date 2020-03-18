@@ -441,6 +441,8 @@ func (b *BackgroundContext) prepareUserExportData(ctx context.Context, accountNu
 		return err
 	}
 
+	s, _ := zipFile.Stat()
+
 	return b.ormDB.Model(&spring.ArchiveORM{}).Where("id = ?", archiveID).
-		Update("file_key", archiveKey).Error
+		Update("file_key", archiveKey).Update("file_size", s.Size()).Error
 }

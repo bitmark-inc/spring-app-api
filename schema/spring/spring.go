@@ -19,13 +19,14 @@ func (AccountORM) TableName() string {
 
 // Spring app total archive
 type ArchiveORM struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	JobID         *uuid.UUID `gorm:"type:uuid"`
-	Status        string
-	FileKey       string
-	AccountNumber string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            uuid.UUID  `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()" json:"id"`
+	JobID         *uuid.UUID `gorm:"type:uuid" json:"-"`
+	Status        string     `json:"status"`
+	FileKey       string     `json:"file_key"`
+	FileSize      int64      `json:"file_size"`
+	AccountNumber string     `json:"-"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 func (ArchiveORM) TableName() string {

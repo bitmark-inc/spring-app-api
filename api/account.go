@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
 	log "github.com/sirupsen/logrus"
 
@@ -180,7 +181,11 @@ func (s *Server) accountExportStatus(c *gin.Context) {
 	var a spring.ArchiveORM
 
 	if err := s.ormDB.Where("account_number = ?", account.AccountNumber).Order("created_at desc").First(&a).Error; err != nil {
-		log.Debug(err)
+		if gorm.IsRecordNotFoundError(err) {
+			abortWithEncoding(c, http.StatusNotFound, errorNoArchiveFound)
+			return
+		}
+		log.Error(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
 	}
@@ -194,7 +199,11 @@ func (s *Server) accountDownloadExport(c *gin.Context) {
 	var a spring.ArchiveORM
 
 	if err := s.ormDB.Where("account_number = ?", account.AccountNumber).Order("created_at desc").First(&a).Error; err != nil {
-		log.Debug(err)
+		if gorm.IsRecordNotFoundError(err) {
+			abortWithEncoding(c, http.StatusNotFound, errorNoArchiveFound)
+			return
+		}
+		log.Error(err)
 		abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 		return
 	}

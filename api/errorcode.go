@@ -20,6 +20,7 @@ var (
 		2000: "file source is not supported",
 		2001: "invalid archive file",
 		2002: "multiple exporting is not allowed",
+		2003: "no archive found",
 	}
 
 	errorInternalServer             = errorJSON(999)
@@ -36,6 +37,7 @@ var (
 	errorFileSourceUnsupported         = errorJSON(2000)
 	errorInvalidArchiveFile            = errorJSON(2001)
 	errorMultipleExportingIsNotAllowed = errorJSON(2002)
+	errorNoArchiveFound                = errorJSON(2003)
 )
 
 // errorJSON converts an error code to a standardized error object

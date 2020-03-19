@@ -133,10 +133,16 @@ func (r *RawPosts) ORM(dataOwner, archiveID string, beginTime, endTime int64) ([
 				if item.Media != nil {
 					post.MediaAttached = true
 					uri := fmt.Sprintf("%s/facebook/archives/%s/data/%s", dataOwner, archiveID, string(item.Media.URI))
+
+					mediaTimestamp := int64(item.Media.CreationTimestamp)
+					if mediaTimestamp == 0 {
+						mediaTimestamp = post.Timestamp
+					}
+
 					postMedia := PostMediaORM{
 						MediaURI:          uri,
 						ThumbnailURI:      uri,
-						Timestamp:         int64(item.Media.CreationTimestamp),
+						Timestamp:         mediaTimestamp,
 						MediaIndex:        int64(i),
 						FilenameExtension: filepath.Ext(string(item.Media.URI)),
 						DataOwnerID:       dataOwner,

@@ -46,7 +46,7 @@ type Coordinate struct {
 
 type Media struct {
 	URI               MojibakeString  `json:"uri" jsonschema:"required"`
-	CreationTimestamp int             `json:"creation_timestamp" jsonschema:"required"`
+	CreationTimestamp int             `json:"creation_timestamp"`
 	MediaMetadata     *MediaMetadata  `json:"media_metadata"`
 	Thumbnail         *MediaThumbnail `json:"thumbnail"`
 	Comments          []*MediaComment `json:"comments"`

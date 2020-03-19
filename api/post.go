@@ -183,7 +183,6 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 			return
 		} else {
 			r.MediaURI = url
-			r.ThumbnailURI = url
 		}
 
 		if r.ThumbnailURI != "" {
@@ -193,6 +192,8 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 			} else {
 				r.ThumbnailURI = url
 			}
+		} else {
+			r.ThumbnailURI = r.MediaURI
 		}
 	}
 

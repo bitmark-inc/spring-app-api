@@ -171,7 +171,7 @@ func main() {
 	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:              viper.GetString("sentry.dsn"),
 		AttachStacktrace: true,
-		Environment:      viper.GetString("bitmarksdk.network"),
+		Environment:      viper.GetString("sentry.environment"),
 	}); err != nil {
 		log.Error(err)
 	}

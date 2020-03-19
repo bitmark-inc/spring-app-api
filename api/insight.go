@@ -12,6 +12,7 @@ import (
 type fbIncomeInfo struct {
 	Income float64
 	From   int64
+	To     int64
 }
 
 func getTotalFBIncomeForDataPeriod(lookupRange []fbIncomePeriod, from, to int64) fbIncomeInfo {
@@ -21,6 +22,7 @@ func getTotalFBIncomeForDataPeriod(lookupRange []fbIncomePeriod, from, to int64)
 		return fbIncomeInfo{
 			Income: 0.0,
 			From:   0,
+			To:     0,
 		}
 	}
 
@@ -49,25 +51,29 @@ func getTotalFBIncomeForDataPeriod(lookupRange []fbIncomePeriod, from, to int64)
 	return fbIncomeInfo{
 		Income: amount,
 		From:   firstDayTimestamp,
+		To:     to,
 	}
 }
 
-func (s *Server) getFBIncomeFromUserData(account *store.Account) fbIncomeInfo {
-	f, ok := account.Metadata["original_timestamp"].(float64)
-	if !ok {
+func (s *Server) getFBIncomeFromUserData(account *store.Account, from, to int64) fbIncomeInfo {
+	if f, ok := account.Metadata["first_activity_timestamp"].(float64); ok {
+		if int64(f) > from {
+			from = int64(f)
+		}
+	}
+
+	if t, ok := account.Metadata["last_activity_timestamp"].(float64); ok {
+		if int64(t) < to {
+			to = int64(t)
+		}
+	}
+
+	if from > to {
 		return fbIncomeInfo{
 			Income: -1,
 			From:   0,
+			To:     0,
 		}
-	}
-	from := int64(f)
-
-	t, ok := account.Metadata["latest_activity_timestamp"].(float64)
-	var to int64
-	if !ok {
-		to = time.Now().Unix()
-	} else {
-		to = int64(t)
 	}
 
 	countryCode := ""
@@ -105,13 +111,33 @@ func (s *Server) getFBIncomeFromUserData(account *store.Account) fbIncomeInfo {
 func (s *Server) getInsight(c *gin.Context) {
 	account := c.MustGet("account").(*store.Account)
 
+	var params struct {
+		StartedAt int64 `form:"started_at"`
+		EndedAt   int64 `form:"ended_at"`
+	}
+
+	if err := c.BindQuery(&params); err != nil {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
+	if params.EndedAt == 0 {
+		params.EndedAt = time.Now().Unix()
+	}
+
+	if params.StartedAt > params.EndedAt {
+		abortWithEncoding(c, http.StatusBadRequest, errorInvalidParameters)
+		return
+	}
+
 	// fb income for data
-	fbIncome := s.getFBIncomeFromUserData(account)
+	fbIncome := s.getFBIncomeFromUserData(account, params.StartedAt, params.EndedAt)
 
 	responseWithEncoding(c, http.StatusOK, &protomodel.InsightResponse{
 		Result: &protomodel.Insight{
 			FbIncome:     fbIncome.Income,
 			FbIncomeFrom: fbIncome.From,
+			FbIncomeTo:   fbIncome.To,
 		},
 	})
 }

@@ -162,6 +162,7 @@ func (b *BackgroundContext) downloadArchive(ctx context.Context, fileURL, archiv
 	}
 
 	if !facebook.IsValidArchiveFile(tmpfile.Name()) {
+		jobError := NewArchiveJobError(archiveid, facebook.ErrInvalidArchive)
 		return jobError(fmt.Errorf("invalid archive file"))
 	}
 

@@ -183,13 +183,16 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 			return
 		} else {
 			r.MediaURI = url
+			r.ThumbnailURI = url
 		}
 
-		if url, err := s3util.GetMediaPresignedURL(sess, r.ThumbnailURI, 10*time.Minute); err != nil {
-			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
-			return
-		} else {
-			r.ThumbnailURI = url
+		if r.ThumbnailURI != "" {
+			if url, err := s3util.GetMediaPresignedURL(sess, r.ThumbnailURI, 10*time.Minute); err != nil {
+				abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
+				return
+			} else {
+				r.ThumbnailURI = url
+			}
 		}
 	}
 

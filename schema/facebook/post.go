@@ -49,12 +49,14 @@ func (p *PostORM) BeforeCreate(scope *gorm.Scope) error {
 
 type PostMediaORM struct {
 	ID                uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	MediaURI          string    `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
+	MediaURI          string
 	ThumbnailURI      string
 	FilenameExtension string
-	DataOwnerID       string  `gorm:"unique_index:facebook_postmedia_owner_media_unique"`
-	Post              PostORM `gorm:"foreignkey:PostID" json:"-"`
-	PostID            uuid.UUID
+	Timestamp         int64     `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
+	MediaIndex        int64     `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
+	DataOwnerID       string    `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
+	Post              PostORM   `gorm:"foreignkey:PostID" json:"-"`
+	PostID            uuid.UUID `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
 	ConflictFlag      bool
 }
 
@@ -70,7 +72,7 @@ type PlaceORM struct {
 	Longitude    float64
 	DataOwnerID  string    `gorm:"unique_index:facebook_place_owner_timestamp_unique"`
 	Post         PostORM   `gorm:"foreignkey:PostID" json:"-"`
-	PostID       uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE: once post one place
+	PostID       uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE:  one place per post
 	ConflictFlag bool
 }
 
@@ -127,13 +129,15 @@ func (r *RawPosts) ORM(dataOwner, archiveID string, beginTime, endTime int64) ([
 
 		complex := false
 		for _, a := range rp.Attachments {
-			for _, item := range a.Data {
+			for i, item := range a.Data {
 				if item.Media != nil {
 					post.MediaAttached = true
 					uri := fmt.Sprintf("%s/facebook/archives/%s/data/%s", dataOwner, archiveID, string(item.Media.URI))
 					postMedia := PostMediaORM{
 						MediaURI:          uri,
 						ThumbnailURI:      uri,
+						Timestamp:         int64(item.Media.CreationTimestamp),
+						MediaIndex:        int64(i),
 						FilenameExtension: filepath.Ext(string(item.Media.URI)),
 						DataOwnerID:       dataOwner,
 					}

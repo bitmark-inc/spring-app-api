@@ -152,16 +152,29 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 						metadata.FirstActivityTimestamp, metadata.LastActivityTimestamp)
 					if err := gormbulk.BulkInsert(db, posts, 500); err != nil {
 						sentry.CaptureException(err)
-						continue
 					}
+
 					for _, p := range complexPosts {
-						if len(p.Tags) > 0 {
+						postTags := p.Tags
+						postMedia := p.MediaItems
+						postPlaces := p.Places
+
+						p.Tags = nil
+						p.MediaItems = nil
+						p.Places = nil
+						if err := db.Set("gorm:insert_option", "ON CONFLICT (timestamp, data_owner_id) DO UPDATE set conflict_flag = true").
+							Create(&p).Error; err != nil {
+							contextLogger.Debug(err)
+							sentry.CaptureException(err)
+						}
+
+						if len(postTags) > 0 {
 							friends := make([]facebook.FriendORM, 0)
 							if err := db.Where("data_owner_id = ?", dataOwner).Find(&friends).Error; err != nil {
 								// friends must exist for inserting tags
 								// deal with the next post if it fails to find friends of this data owner
+								contextLogger.Error(err)
 								sentry.CaptureException(err)
-								continue
 							}
 
 							friendIDs := make(map[string]uuid.UUID)
@@ -170,20 +183,50 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 							}
 
 							// FIXME: non-friends couldn't be tagged
-							c := 0 // valid tag count
-							for i := range p.Tags {
-								friendID, ok := friendIDs[p.Tags[i].FriendName]
+							for _, tag := range postTags {
+								friendID, ok := friendIDs[tag.FriendName]
 								if ok {
-									p.Tags[i].FriendID = friendID
-									c++
+									tag.FriendID = friendID
+									tag.PostID = p.ID
+									if err := db.Create(&tag).Error; err != nil {
+										contextLogger.Error(err)
+										sentry.CaptureException(err)
+									}
 								}
 							}
-							p.Tags = p.Tags[:c]
 						}
 
-						if err := db.Create(&p).Error; err != nil {
-							sentry.CaptureException(err)
-							continue
+						if len(postMedia) > 0 {
+							for _, m := range postMedia {
+								var currentMedia facebook.PostMediaORM
+								if err := db.Where("timestamp = ? AND media_index = ? AND data_owner_id = ? AND post_id = ?",
+									m.Timestamp, m.MediaIndex, m.DataOwnerID, p.ID).
+									First(&currentMedia).Error; err != nil {
+									if gorm.IsRecordNotFoundError(err) {
+										m.PostID = p.ID
+									} else {
+										contextLogger.Error(err)
+										sentry.CaptureException(err)
+									}
+								} else {
+									m.ID = currentMedia.ID
+									m.PostID = currentMedia.PostID
+								}
+								if err := db.Save(&m).Error; err != nil {
+									contextLogger.Error(err)
+									sentry.CaptureException(err)
+								}
+							}
+						}
+
+						if len(postPlaces) > 0 {
+							for _, place := range postPlaces {
+								place.PostID = p.ID
+								if err := db.Create(&place).Error; err != nil {
+									contextLogger.Error(err)
+									sentry.CaptureException(err)
+								}
+							}
 						}
 					}
 				case "comments":

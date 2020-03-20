@@ -57,7 +57,6 @@ type PostMediaORM struct {
 	DataOwnerID       string    `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
 	Post              PostORM   `gorm:"foreignkey:PostID" json:"-"`
 	PostID            uuid.UUID `gorm:"unique_index:facebook_postmedia_owner_post_id_timestamp_unique"`
-	ConflictFlag      bool
 }
 
 func (PostMediaORM) TableName() string {
@@ -65,15 +64,14 @@ func (PostMediaORM) TableName() string {
 }
 
 type PlaceORM struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	Name         string
-	Address      string
-	Latitude     float64
-	Longitude    float64
-	DataOwnerID  string    `gorm:"unique_index:facebook_place_owner_timestamp_unique"`
-	Post         PostORM   `gorm:"foreignkey:PostID" json:"-"`
-	PostID       uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE:  one place per post
-	ConflictFlag bool
+	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
+	Name        string
+	Address     string
+	Latitude    float64
+	Longitude   float64
+	DataOwnerID string    `gorm:"unique_index:facebook_place_owner_timestamp_unique"`
+	Post        PostORM   `gorm:"foreignkey:PostID" json:"-"`
+	PostID      uuid.UUID `gorm:"unique_index:facebook_place_owner_timestamp_unique"` // NOTE:  one place per post
 }
 
 func (PlaceORM) TableName() string {
@@ -81,14 +79,13 @@ func (PlaceORM) TableName() string {
 }
 
 type TagORM struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	DataOwnerID  string    `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
-	Post         PostORM   `gorm:"foreignkey:PostID" json:"-"`
-	PostID       uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
-	Friend       FriendORM `gorm:"foreignkey:FriendID" json:"-"`
-	FriendID     uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
-	FriendName   string
-	ConflictFlag bool
+	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
+	DataOwnerID string    `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	Post        PostORM   `gorm:"foreignkey:PostID" json:"-"`
+	PostID      uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	Friend      FriendORM `gorm:"foreignkey:FriendID" json:"-"`
+	FriendID    uuid.UUID `gorm:"unique_index:facebook_tag_owner_post_friend_unique"`
+	FriendName  string
 }
 
 func (TagORM) TableName() string {

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -147,7 +148,10 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 					}
 				case "posts":
 					rawPosts := facebook.RawPosts{Items: make([]*facebook.RawPost, 0)}
-					json.Unmarshal(data, &rawPosts.Items)
+					if err := json.Unmarshal(data, &rawPosts.Items); err != nil {
+						sentry.CaptureException(err)
+						return err
+					}
 					posts, complexPosts := rawPosts.ORM(dataOwner, fmt.Sprint(archive.ID),
 						metadata.FirstActivityTimestamp, metadata.LastActivityTimestamp)
 					if err := gormbulk.BulkInsert(db, posts, 500); err != nil {
@@ -189,8 +193,10 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 									tag.FriendID = friendID
 									tag.PostID = p.ID
 									if err := db.Create(&tag).Error; err != nil {
-										contextLogger.Error(err)
-										sentry.CaptureException(err)
+										if err != sql.ErrNoRows {
+											contextLogger.Error(err)
+											sentry.CaptureException(err)
+										}
 									}
 								}
 							}
@@ -223,18 +229,54 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 							for _, place := range postPlaces {
 								place.PostID = p.ID
 								if err := db.Create(&place).Error; err != nil {
-									contextLogger.Error(err)
-									sentry.CaptureException(err)
+									if err != sql.ErrNoRows {
+										contextLogger.Error(err)
+										sentry.CaptureException(err)
+									}
 								}
 							}
 						}
 					}
 				case "comments":
 					rawComments := &facebook.RawComments{}
-					json.Unmarshal(data, &rawComments)
-					if err := gormbulk.BulkInsert(db, rawComments.ORM(dataOwner), 500); err != nil {
+					if err := json.Unmarshal(data, &rawComments); err != nil {
+						sentry.CaptureException(err)
+						return err
+					}
+					comments, complexComments := rawComments.ORM(dataOwner, archiveID)
+					if err := gormbulk.BulkInsert(db, comments, 500); err != nil {
 						sentry.CaptureException(err)
 						continue
+					}
+					for _, comment := range complexComments {
+						commentMedia := comment.MediaItems
+						comment.MediaItems = nil
+						if err := db.Set("gorm:insert_option", "ON CONFLICT (timestamp, data_owner_id) DO UPDATE set conflict_flag = true").
+							Create(&comment).Error; err != nil {
+							contextLogger.Debug(err)
+							sentry.CaptureException(err)
+						}
+
+						for _, m := range commentMedia {
+							var currentMedia facebook.CommentMediaORM
+							if err := db.Where("timestamp = ? AND media_index = ? AND data_owner_id = ? AND comment_id = ?",
+								m.Timestamp, m.MediaIndex, m.DataOwnerID, comment.ID).
+								First(&currentMedia).Error; err != nil {
+								if gorm.IsRecordNotFoundError(err) {
+									m.CommentID = comment.ID
+								} else {
+									contextLogger.Debug(err)
+									sentry.CaptureException(err)
+								}
+							} else {
+								m.ID = currentMedia.ID
+								m.CommentID = comment.ID
+							}
+							if err := db.Save(&m).Error; err != nil {
+								contextLogger.Debug(err)
+								sentry.CaptureException(err)
+							}
+						}
 					}
 				case "reactions":
 					rawReactions := &facebook.RawReactions{}

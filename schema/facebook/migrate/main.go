@@ -33,6 +33,7 @@ func main() {
 
 	db.AutoMigrate(
 		&facebook.CommentORM{},
+		&facebook.CommentMediaORM{},
 		&facebook.FriendORM{},
 		&facebook.PlaceORM{},
 		&facebook.PostORM{},

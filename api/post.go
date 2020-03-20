@@ -157,10 +157,11 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 
 	results := make([]*struct {
 		Id                string `json:"id"`
-		MediaURI          string `json:"source"`
+		MediaURI          string `json:"uri"`
 		ThumbnailURI      string `json:"thumbnail"`
 		FilenameExtension string `json:"extension"`
 		Timestamp         int64  `json:"timestamp"`
+		SourceURI         string `json:"source"`
 	}, 0)
 
 	if err := s.ormDB.Table("facebook_postmedia").
@@ -182,7 +183,7 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 			abortWithEncoding(c, http.StatusInternalServerError, errorInternalServer)
 			return
 		} else {
-			r.MediaURI = url
+			r.SourceURI = url
 		}
 
 		if r.ThumbnailURI != "" {
@@ -193,7 +194,7 @@ func (s *Server) getAllPostMedia(c *gin.Context) {
 				r.ThumbnailURI = url
 			}
 		} else {
-			r.ThumbnailURI = r.MediaURI
+			r.ThumbnailURI = r.SourceURI
 		}
 	}
 

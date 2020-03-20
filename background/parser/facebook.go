@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/getsentry/sentry-go"
@@ -186,17 +187,32 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 								friendIDs[f.FriendName] = f.ID
 							}
 
-							// FIXME: non-friends couldn't be tagged
 							for _, tag := range postTags {
 								friendID, ok := friendIDs[tag.FriendName]
-								if ok {
-									tag.FriendID = friendID
-									tag.PostID = p.ID
-									if err := db.Create(&tag).Error; err != nil {
+								if !ok {
+									friend := &facebook.FriendORM{
+										FriendName:  tag.FriendName,
+										DataOwnerID: dataOwner,
+										Timestamp:   time.Now().UnixNano(),
+									}
+									if err := db.Where("data_owner_id = ? AND friend_name = ?", dataOwner, tag.FriendName).
+										FirstOrCreate(&friend).Error; err != nil {
 										if err != sql.ErrNoRows {
 											contextLogger.Error(err)
 											sentry.CaptureException(err)
+											continue
 										}
+									}
+
+									friendID = friend.ID
+									friendIDs[tag.FriendName] = friendID
+								}
+								tag.FriendID = friendID
+								tag.PostID = p.ID
+								if err := db.Create(&tag).Error; err != nil {
+									if err != sql.ErrNoRows {
+										contextLogger.Error(err)
+										sentry.CaptureException(err)
 									}
 								}
 							}

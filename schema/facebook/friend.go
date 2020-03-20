@@ -31,7 +31,6 @@ func FriendSchemaLoader() *gojsonschema.Schema {
 
 type FriendORM struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key" sql:"default:uuid_generate_v4()"`
-	FriendID    int64
 	FriendName  string
 	Timestamp   int64  `gorm:"unique_index:facebook_friend_owner_timestamp_unique"`
 	DataOwnerID string `gorm:"unique_index:facebook_friend_owner_timestamp_unique"`

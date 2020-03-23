@@ -12,12 +12,14 @@ import (
 )
 
 var (
-	FriendsPattern   = Pattern{Name: "friends", Location: "friends", Regexp: regexp.MustCompile("^friends.json"), Schema: FriendSchemaLoader()}
-	PostsPattern     = Pattern{Name: "posts", Location: "posts", Regexp: regexp.MustCompile("your_posts(?P<index>_[0-9]+).json"), Schema: PostArraySchemaLoader()}
-	ReactionsPattern = Pattern{Name: "reactions", Location: "likes_and_reactions", Regexp: regexp.MustCompile("posts_and_comments.json"), Schema: ReactionSchemaLoader()}
-	CommentsPattern  = Pattern{Name: "comments", Location: "comments", Regexp: regexp.MustCompile("comments.json"), Schema: CommentArraySchemaLoader()}
-	MediaPattern     = Pattern{Name: "media", Location: "photos_and_videos"}
-	FilesPattern     = Pattern{Name: "files", Location: "files"}
+	FriendsPattern        = Pattern{Name: "friends", Location: "friends", Regexp: regexp.MustCompile("^friends.json"), Schema: FriendSchemaLoader()}
+	PostsPattern          = Pattern{Name: "posts", Location: "posts", Regexp: regexp.MustCompile("your_posts(?P<index>_[0-9]+).json"), Schema: PostArraySchemaLoader()}
+	ReactionsPattern      = Pattern{Name: "reactions", Location: "likes_and_reactions", Regexp: regexp.MustCompile("posts_and_comments.json"), Schema: ReactionSchemaLoader()}
+	CommentsPattern       = Pattern{Name: "comments", Location: "comments", Regexp: regexp.MustCompile("comments.json"), Schema: CommentArraySchemaLoader()}
+	InvitedEventPattern   = Pattern{Name: "invited_events", Location: "events", Regexp: regexp.MustCompile("event_invitations.json"), Schema: InvitedEventSchemaLoader()}
+	RespondedEventPattern = Pattern{Name: "responded_events", Location: "events", Regexp: regexp.MustCompile("your_event_responses.json"), Schema: RespondedEventSchemaLoader()}
+	MediaPattern          = Pattern{Name: "media", Location: "photos_and_videos"}
+	FilesPattern          = Pattern{Name: "files", Location: "files"}
 )
 
 type Pattern struct {

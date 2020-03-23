@@ -34,6 +34,7 @@ func main() {
 	db.AutoMigrate(
 		&facebook.CommentORM{},
 		&facebook.CommentMediaORM{},
+		&facebook.EventORM{},
 		&facebook.FriendORM{},
 		&facebook.PlaceORM{},
 		&facebook.PostORM{},
@@ -73,6 +74,14 @@ func main() {
 
 	db.Model(facebook.CommentORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")
 	db.Model(facebook.CommentORM{}).AddForeignKey("data_owner_id", "account(account_number)", "CASCADE", "NO ACTION")
+
+	db.Model(facebook.CommentMediaORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")
+	db.Model(facebook.CommentMediaORM{}).AddForeignKey("data_owner_id", "account(account_number)", "CASCADE", "NO ACTION")
+	db.Model(facebook.CommentMediaORM{}).RemoveForeignKey("comment_id", "facebook_comment(id)")
+	db.Model(facebook.CommentMediaORM{}).AddForeignKey("comment_id", "facebook_comment(id)", "CASCADE", "NO ACTION")
+
+	db.Model(facebook.EventORM{}).RemoveForeignKey("data_owner_id", "account(account_number)")
+	db.Model(facebook.EventORM{}).AddForeignKey("data_owner_id", "account(account_number)", "CASCADE", "NO ACTION")
 
 	db.Model(spring.ArchiveORM{}).RemoveForeignKey("account_number", "account(account_number)")
 	db.Model(spring.ArchiveORM{}).AddForeignKey("account_number", "account(account_number)", "CASCADE", "NO ACTION")

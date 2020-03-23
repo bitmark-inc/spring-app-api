@@ -28,6 +28,8 @@ var patterns = []facebook.Pattern{
 	facebook.PostsPattern,
 	facebook.ReactionsPattern,
 	facebook.CommentsPattern,
+	facebook.InvitedEventPattern,
+	facebook.RespondedEventPattern,
 	facebook.MediaPattern,
 	facebook.FilesPattern,
 }
@@ -298,6 +300,20 @@ func ParseFacebookArchive(sess *session.Session, db *gorm.DB, accountNumber, wor
 					rawReactions := &facebook.RawReactions{}
 					json.Unmarshal(data, &rawReactions)
 					if err := gormbulk.BulkInsert(db, rawReactions.ORM(dataOwner), 500); err != nil {
+						sentry.CaptureException(err)
+						continue
+					}
+				case "invited_events":
+					rawInvitedEvents := &facebook.RawInvitedEvent{}
+					json.Unmarshal(data, &rawInvitedEvents)
+					if err := gormbulk.BulkInsert(db, rawInvitedEvents.ORM(dataOwner), 500); err != nil {
+						sentry.CaptureException(err)
+						continue
+					}
+				case "responded_events":
+					rawRespondedEvents := &facebook.RawRespondedEvent{}
+					json.Unmarshal(data, &rawRespondedEvents)
+					if err := gormbulk.BulkInsert(db, rawRespondedEvents.ORM(dataOwner), 500); err != nil {
 						sentry.CaptureException(err)
 						continue
 					}

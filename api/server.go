@@ -189,6 +189,13 @@ func (s *Server) setupRouter() *gin.Engine {
 		reactionRoute.GET("", s.getAllReactions)
 	}
 
+	eventRoute := apiRoute.Group("/events")
+	eventRoute.Use(s.authMiddleware())
+	eventRoute.Use(s.fakeCredential())
+	{
+		eventRoute.GET("", s.getAllEvents)
+	}
+
 	usageRoute := apiRoute.Group("/usage")
 	usageRoute.Use(s.authMiddleware())
 	usageRoute.Use(s.fakeCredential())
